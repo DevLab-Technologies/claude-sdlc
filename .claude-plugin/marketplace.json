@@ -1,0 +1,18 @@
+{
+  "name": "miza-sdlc",
+  "description": "Automated software development lifecycle for Claude Code",
+  "owner": {
+    "name": "Ahmed Elkhayyat",
+    "email": "ahmed.elkhayyat@miza.capital"
+  },
+  "plugins": [
+    {
+      "name": "sdlc-pipeline",
+      "source": "./plugins/sdlc-pipeline",
+      "displayName": "SDLC Pipeline",
+      "description": "Feature request to shipped work: intake, research, PRD and stories, UX design and audit, architecture with ADRs, implementation, root-cause debugging, code review, functional and UI QA — cycling until every gate passes.",
+      "category": "workflow",
+      "tags": ["sdlc", "orchestration", "qa", "architecture", "debugging"]
+    }
+  ]
+}

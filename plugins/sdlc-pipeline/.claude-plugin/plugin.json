@@ -1,0 +1,22 @@
+{
+  "name": "sdlc-pipeline",
+  "displayName": "SDLC Pipeline",
+  "description": "Automated software development lifecycle — intake, research, PRD and stories, UX design and audit, architecture with ADRs, implementation, root-cause debugging, code review, functional and UI QA, cycling until every gate passes. Agents coordinate through a durable filesystem workspace with an append-only history.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Ahmed Elkhayyat",
+    "email": "ahmed.elkhayyat@miza.capital"
+  },
+  "keywords": [
+    "sdlc",
+    "orchestration",
+    "product-requirements",
+    "architecture",
+    "adr",
+    "code-review",
+    "qa",
+    "debugging",
+    "root-cause-analysis"
+  ],
+  "license": "MIT"
+}
