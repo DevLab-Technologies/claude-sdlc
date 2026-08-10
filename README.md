@@ -10,10 +10,11 @@ This repository is a **Claude Code plugin marketplace**. The plugin lives in
 
 ## What you get
 
-Thirteen commands and agents, coordinating through a durable filesystem workspace:
+Fourteen commands and agents, coordinating through a durable filesystem workspace:
 
 - `/sdlc <request>` — the full pipeline: intake, research, PRD and stories, UX design, UX
-  audit, architecture with ADRs, implementation, review, functional QA, UI QA, release gate
+  audit, architecture with ADRs, a reviewed test plan written before the code, implementation,
+  review, functional QA, UI QA, release gate
 - `/sdlc-bug <report>` — the root-cause path: reproduce, prove the cause, fix the cause, add
   a regression test, verify, sweep the blast radius
 - `/sdlc-status [slug]` — position, gates, issues, investigations, and the next action
@@ -125,19 +126,33 @@ project can opt out.
 For CI or container images, pre-populate the plugin cache at build time with
 `CLAUDE_CODE_PLUGIN_SEED_DIR` so nothing is cloned at runtime.
 
-## Updating
+## How your team gets updates
 
-Push changes to this repository, then:
+Push to this repository. Each person then runs:
 
 ```bash
 claude plugin update sdlc-pipeline@miza-sdlc
 ```
 
-The plugin has `"version": "0.1.0"` in its manifest, so installs are pinned to that string
-and your team receives updates only when you bump it. While the pipeline is still under
-active development, remove the `version` field from
-[`plugin.json`](plugins/sdlc-pipeline/.claude-plugin/plugin.json) and the marketplace entry —
-then every push reaches the team on their next update.
+Or `/plugin` inside a session, which lists what has an update available.
+
+The manifest carries **no `version` field**, deliberately. That puts the plugin on
+commit-tracked versioning: the resolved commit SHA is the version, so every push you make is an
+available update — no version bumping, nothing to remember. This is the right mode while the
+agents are still being tuned.
+
+Two things follow from it:
+
+- **Updates are not automatic.** Nobody's behavior changes until they run `update`. If a change
+  matters, tell them; a pipeline where half the team is on an older protocol produces
+  inconsistent artifacts.
+- **Restart to pick it up.** Commands, agents, and skills register at session start, so an
+  update mid-session takes effect in the next one.
+
+Once the pipeline is stable and you want releases instead of a moving target, add
+`"version": "1.0.0"` back to
+[`plugin.json`](plugins/sdlc-pipeline/.claude-plugin/plugin.json). Installs then pin to that
+string and only move when you bump it.
 
 ## Maintaining it
 
@@ -162,7 +177,7 @@ Edit them — that is the point.
 
 - Swap `sdlc-implementer` for a stack specialist and keep the sections on contracts,
   verification, and the task record.
-- Add a security phase by running your auditor alongside `sdlc-code-reviewer` in phase 7.
+- Add a security phase by running your auditor alongside `sdlc-code-reviewer` in phase 8.
 - Tune `max_cycles` per feature in `state.json`; lower it for exploratory work so it
   escalates sooner.
 - The gate criteria in the `sdlc-protocol` skill are where a team's real standards belong.

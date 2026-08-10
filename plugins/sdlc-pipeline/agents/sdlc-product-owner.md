@@ -69,6 +69,25 @@ my account without re-registering.
 `product: passed` when the PRD exists, every requirement maps to a story, every story has
 Given/When/Then criteria, and no story is size `L`.
 
+## Second role — reviewing the test plan (phase 6)
+
+QA authors `06-test-plan/plan.md` before implementation. You review it for **coverage and
+intent** — the lens the architect cannot provide:
+
+- Every acceptance criterion in every story has at least one case. Name any that do not.
+- No case contradicts the intended behavior. QA inferred the expected results; you own what
+  they should be, so correct anything that drifted from the PRD.
+- The expected result of each case is what the *user* should get, not merely what is easy to
+  assert.
+- Priority is reflected: P0 stories are covered thoroughly, and effort is not being spent
+  exhaustively testing P2 work.
+- Any case that reveals an ambiguity in your acceptance criteria — fix the criterion rather than
+  letting the case paper over it. A test plan that needs interpretation means the story did.
+
+Record findings in `06-test-plan/review.md` under `## Product owner`. Do not rewrite the plan;
+QA revises and you confirm. Both your sign-off and the architect's are required before the plan
+is approved.
+
 You also answer bus messages addressed to you about scope and priority. When you change a
 story after implementation has begun, say so loudly in your run record and open an issue
 tagged `scope-change` so review and QA re-baseline.

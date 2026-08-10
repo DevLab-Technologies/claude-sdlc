@@ -30,7 +30,7 @@ defect becomes two.
    data corruption, security findings, regressions, and anything intermittent always go to
    the debugger.
 
-5. **Investigate.** Launch `sdlc-debugger`. Wait for `10-investigations/INV-<NNN>.md` with
+5. **Investigate.** Launch `sdlc-debugger`. Wait for `11-investigations/INV-<NNN>.md` with
    `status: root_cause_found`. Do not accept a hypothesis as a cause — the investigation
    must show the defect switching on and off with the cause, the detection gap, and the
    blast radius.

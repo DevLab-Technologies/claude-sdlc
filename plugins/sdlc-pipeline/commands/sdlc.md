@@ -34,14 +34,23 @@ trust the artifacts, not the agent's summary — and only then proceed.
 | 3 | `sdlc-ux-designer` (skip if no user-facing surface — record why) | design |
 | 4 | `sdlc-ux-auditor` | ux-audit |
 | 5 | `sdlc-architect` | architecture |
-| 6 | `sdlc-implementer` — one instance per workplan task | implementation |
-| 7 | `sdlc-code-reviewer` + `sdlc-architect` (compliance review) | review |
-| 8 | `sdlc-qa-functional` | qa |
-| 9 | `sdlc-qa-ui` (skip if no UI) | ui-qa |
-| 10 | `sdlc-release-gate` | release |
+| 6 | `sdlc-qa-functional` (plan mode) -> `sdlc-architect` + `sdlc-product-owner` review -> QA revises and approves | test-plan |
+| 7 | `sdlc-implementer` — one instance per workplan task, writing its assigned `TC` cases | implementation |
+| 8 | `sdlc-code-reviewer` + `sdlc-architect` (compliance review) | review |
+| 9 | `sdlc-qa-functional` (execute mode) | qa |
+| 10 | `sdlc-qa-ui` (skip if no UI) | ui-qa |
+| 11 | `sdlc-release-gate` | release |
 
 Rules for the sequence:
 - **Stop at a failed gate.** Never run a downstream phase on a failed upstream gate.
+- **Phase 6 is a loop, not a single call.** QA authors the plan, then the architect and product
+  owner review it **in parallel** (independent lenses — launch them together), then QA revises
+  and confirms each finding. Only an `approved` plan unlocks implementation. Do not let
+  implementation start against a `draft` or `in_review` plan; the whole point is that the cases
+  are specified before the code.
+- **Phase 7 implementers must be handed their `TC` ids**, from `06-test-plan/assignments.md`.
+  An implementer launched without its assigned cases will invent its own tests, which is the
+  failure mode this phase exists to prevent.
 - **Intake blocking questions stop everything.** Present them to the human verbatim and
   wait. This is the one place the pipeline is allowed to block on a person.
 - **Parallelize only what the workplan declares parallel.** Launch those implementers in

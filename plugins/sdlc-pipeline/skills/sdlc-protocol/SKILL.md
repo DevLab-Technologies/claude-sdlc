@@ -41,22 +41,26 @@ Every feature gets one directory: `.sdlc/features/<slug>/`
     architecture.md
     interfaces.md         # API/type contracts implementers must honor
     workplan.md           # ordered, parallelizable implementation tasks
-    test-strategy.md
-  06-implementation/
+    test-strategy.md      # levels, fixtures, what is worth testing
+  06-test-plan/
+    plan.md               # the binding test contract — every case, before code exists
+    review.md             # adversarial edge-case review of the plan
+    assignments.md        # which case each implementer owns, at which level
+  07-implementation/
     TASK-001.md           # per-task record: files touched, decisions, deviations
     handoff.md            # what QA and review need to know
-  07-review/
+  08-review/
     cycle-<n>/code-review.md
     cycle-<n>/security-review.md
-  08-qa/
-    cycle-<n>/test-plan.md
-    cycle-<n>/functional-qa.md
+  09-qa/
+    cycle-<n>/functional-qa.md   # execution of the approved plan
     cycle-<n>/ui-qa.md
-  09-release/
+    cycle-<n>/exploratory.md     # cases discovered while executing
+  10-release/
     traceability.md
     cycle-<n>-decision.md
     release-notes.md
-  10-investigations/
+  11-investigations/
     INV-001.md            # root-cause investigation per non-obvious defect
   issues/
     ISSUE-001.md          # one file per finding, any source
@@ -78,15 +82,15 @@ Paths are relative to the repo root. Never write outside your own phase director
   "slug": "user-auth",
   "title": "Email + password authentication",
   "created": "2026-08-10",
-  "phase": "08-qa",
+  "phase": "09-qa",
   "cycle": 2,
   "max_cycles": 5,
   "status": "in_progress",
   "gates": {
     "intake": "passed", "research": "passed", "product": "passed",
     "design": "passed", "ux-audit": "passed", "architecture": "passed",
-    "implementation": "passed", "review": "failed", "qa": "pending",
-    "ui-qa": "pending", "release": "pending"
+    "test-plan": "passed", "implementation": "passed", "review": "failed",
+    "qa": "pending", "ui-qa": "pending", "release": "pending"
   },
   "open_questions": 0,
   "issues": { "blocker": 1, "major": 2, "minor": 4, "nit": 3 },
@@ -107,13 +111,13 @@ new cycle.
 Append exactly one JSON line to `history/events.jsonl` per meaningful event:
 
 ```json
-{"ts":"2026-08-10T14:22:05Z","cycle":2,"agent":"sdlc-code-reviewer","event":"run_complete","phase":"07-review","verdict":"failed","summary":"3 findings: 1 blocker (unbounded query), 2 major","artifacts":["07-review/cycle-2/code-review.md"],"issues_opened":["ISSUE-011","ISSUE-012","ISSUE-013"],"next":"sdlc-implementer"}
+{"ts":"2026-08-10T14:22:05Z","cycle":2,"agent":"sdlc-code-reviewer","event":"run_complete","phase":"08-review","verdict":"failed","summary":"3 findings: 1 blocker (unbounded query), 2 major","artifacts":["08-review/cycle-2/code-review.md"],"issues_opened":["ISSUE-011","ISSUE-012","ISSUE-013"],"next":"sdlc-implementer"}
 ```
 
 Event types: `phase_start`, `run_complete`, `question_asked`, `question_answered`,
 `issue_opened`, `issue_triaged`, `investigation_started`, `investigation_complete`,
 `root_cause_found`, `issue_fixed`, `issue_verified`, `issue_reopened`, `adr_recorded`,
-`gate_passed`, `gate_failed`, `cycle_opened`, `cycle_closed`, `escalated`, `shipped`.
+`test_plan_approved`, `test_plan_amended`, `gate_passed`, `gate_failed`, `cycle_opened`, `cycle_closed`, `escalated`, `shipped`.
 
 Also write the **full** narrative outcome of your run to
 `history/runs/<ISO-timestamp>-<your-agent-name>.md` with this header:
@@ -121,11 +125,11 @@ Also write the **full** narrative outcome of your run to
 ```markdown
 ---
 agent: sdlc-code-reviewer
-phase: 07-review
+phase: 08-review
 cycle: 2
 verdict: failed
-inputs: [05-architecture/interfaces.md, 06-implementation/handoff.md]
-outputs: [07-review/cycle-2/code-review.md]
+inputs: [05-architecture/interfaces.md, 07-implementation/handoff.md]
+outputs: [08-review/cycle-2/code-review.md]
 ---
 ```
 
@@ -144,7 +148,7 @@ id: ISSUE-011
 title: Session lookup runs an unbounded query per request
 severity: blocker        # blocker | major | minor | nit
 source: sdlc-code-reviewer
-phase_found: 07-review
+phase_found: 08-review
 cycle_found: 2
 story: STORY-003
 location: src/auth/session.ts:41
@@ -207,6 +211,101 @@ and the ADR record; when the detection gap is systemic, the architect amends
 
 Related issues sharing one root cause are fixed **once** and cross-linked via
 `related_issues`. Three symptoms and one cause is one fix, not three.
+
+## 4c. The test plan is a contract, written before the code
+
+Tests are specified **before** implementation, by QA, independently of the implementer. This
+is deliberate: an implementer who derives their own test cases tests what they built, not what
+was asked for, and the gaps only surface after the code is finished — as rework.
+
+The order is: QA authors the plan -> the plan is reviewed adversarially for missing edge
+cases -> approved cases are assigned to implementers as work -> implementers write those tests
+alongside the code -> QA executes the approved plan and verifies each case is genuinely
+covered.
+
+### The plan
+
+`06-test-plan/plan.md` opens with a status header and holds every case:
+
+```markdown
+---
+status: draft          # draft | in_review | approved | amended
+cycle_approved: 1
+cases: 47
+---
+```
+
+One row per case in an index table, plus a detail block for any case whose steps do not fit
+on one line:
+
+| id | story | ac | level | type | owner | expected | test_file | status |
+|---|---|---|---|---|---|---|---|---|
+| TC-014 | STORY-003 | AC-2 | unit | negative | backend | single non-enumerating error, password field cleared | — | planned |
+
+- **level**: `unit` | `integration` | `e2e` | `manual` — manual only when automation is
+  genuinely impractical, and the reason is stated
+- **type**: `happy` | `boundary` | `negative` | `error` | `concurrency` | `security` |
+  `performance` | `a11y` | `regression`
+- **owner**: the implementer role that will write it (`backend`, `frontend`, `mobile`), or
+  `qa` for cases QA automates itself
+- **test_file**: empty until an implementer fills in `path::test name`
+- **status**: `planned` -> `implemented` -> `passing` | `failing` | `not_run`
+
+Every acceptance criterion must have at least one case at the lowest level that can prove it,
+plus an `e2e` case for each P0 story's happy path. A case must be specific enough that two
+different engineers would write the same assertion from it.
+
+### Edge cases the plan must consider explicitly
+
+Walk this list per story and either write a case or record why it does not apply. Silence is
+not a decision:
+
+boundaries (zero, one, maximum, one past maximum, empty, whitespace, very long) · absent and
+null inputs · malformed and wrong-type inputs · duplicate submission and double-click ·
+concurrent access to the same record · out-of-order and repeated events · interrupted flow
+(navigate away, refresh, kill mid-request) · expired or revoked session · insufficient
+permission · network failure, timeout, and partial response · dependency unavailable ·
+idempotency of retries · pagination limits and empty pages · time and timezone, DST, clock
+skew · unicode, emoji, and right-to-left text in every free-text field · numeric precision
+and rounding on money · sort stability and tie-breaking · cache staleness after write ·
+migration and rollback of any schema change
+
+### The review
+
+`06-test-plan/review.md`. Two independent lenses, both required before the plan is approved:
+
+- **`sdlc-architect`** — technical gaps: the failure modes in `architecture.md` that have no
+  case, the concurrency and boundary conditions the interfaces make possible, and whether each
+  case is at the right level. A case written at `e2e` that belongs in `unit` is a finding.
+- **`sdlc-product-owner`** — coverage gaps: any acceptance criterion with no case, any case
+  that contradicts the intended behavior, and whether the expected results match the PRD
+  rather than a guess.
+
+Reviewers do not rewrite the plan; they record findings, QA revises, and the reviewer confirms.
+Findings at `blocker` or `major` become issues like any other. When both lenses sign off, QA
+sets `status: approved` and the plan is frozen for the cycle.
+
+### Assignment and implementation
+
+The architect folds the approved cases into `05-architecture/workplan.md` so tests are
+scheduled work, not an afterthought — each task's definition of done names the `TC` ids it
+must deliver. `06-test-plan/assignments.md` records the mapping.
+
+Implementers write their assigned cases as real tests, reference the `TC` id in each test's
+name or a comment so traceability survives, and fill in `test_file` on the plan row. An
+implementer who believes a case is wrong buses QA — they do not silently drop it or weaken its
+assertion.
+
+Writing the test first, watching it fail, then implementing is encouraged and never required.
+What is required is that the assigned cases exist and assert what the plan says.
+
+### Amending an approved plan
+
+Plans are amended, never quietly edited. QA appends new cases (including anything found
+during execution, recorded in `09-qa/cycle-<n>/exploratory.md`) with `status: planned` and a
+one-line reason, bumps the header to `amended`, and appends a `test_plan_amended` event. Cases
+are never deleted — a case that turns out to be invalid is marked `withdrawn` with a rationale
+so the history shows the reasoning.
 
 ## 5. The bus — directed agent-to-agent questions
 

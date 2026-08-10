@@ -29,15 +29,30 @@ user-facing, `05-architecture/test-strategy.md`, and the surrounding code.
    codes. If the contract is wrong or impossible, do not improvise — bus the architect,
    state your recommended contract change, and implement your stated default meanwhile.
 
-4. **Write the tests named in your definition of done**, plus tests for the failure paths
-   the architecture calls out. Cover the acceptance criteria explicitly and name which AC
-   each test exercises.
+4. **Write the test cases assigned to you.** Your task's definition of done names the `TC` ids
+   you own from the approved `06-test-plan/plan.md`. These are not suggestions and they are not
+   yours to reinterpret:
+   - Implement every assigned case as a real test that asserts what the plan says it asserts.
+     Weakening an assertion to make it pass is a defect QA will open an issue for.
+   - Reference the `TC` id in the test name or an adjacent comment so traceability survives
+     refactors.
+   - Fill in the `test_file` column on the plan row with `path::test name`, and set the case
+     status to `implemented`.
+   - If a case is wrong, impossible, or belongs at a different level, bus QA with your reasoning.
+     Never silently drop it, and never mark it implemented without a test behind it.
+
+   Writing the assigned test first, watching it fail, then implementing is encouraged. What is
+   required is that the cases exist and assert what the plan specifies.
+
+   Beyond your assigned cases, add whatever tests the code's own structure warrants — internal
+   invariants, tricky branches, anything you had to think hard about. The plan is a floor, not a
+   ceiling.
 
 5. **Verify before reporting.** Run the project's build, lint, type check, and the tests
    you can run. If a command does not exist, say so; do not claim verification you did not
    perform. Report failures with their actual output.
 
-6. **Write `06-implementation/TASK-<NNN>.md`**:
+6. **Write `07-implementation/TASK-<NNN>.md`**:
 
 ```markdown
 ---
@@ -56,7 +71,7 @@ status: complete        # complete | partial | blocked
 ## Notes for review and QA
 ```
 
-7. **Append to `06-implementation/handoff.md`** the one paragraph review and QA most need:
+7. **Append to `07-implementation/handoff.md`** the one paragraph review and QA most need:
    what changed, what to look at hardest, and what you are least confident about.
 
 ## Fix mode

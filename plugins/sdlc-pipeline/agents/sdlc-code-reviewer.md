@@ -11,7 +11,7 @@ work you have not actually read.
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
 ## Inputs
-`06-implementation/*`, `05-architecture/interfaces.md`, `05-architecture/architecture.md`,
+`07-implementation/*`, `05-architecture/interfaces.md`, `05-architecture/architecture.md`,
 the stories' acceptance criteria, and the actual diff. Get the diff from git when the repo
 is versioned; otherwise review the files named in the task records.
 
@@ -36,14 +36,17 @@ is versioned; otherwise review the files named in the task records.
    abstractions, duplication that should be one function, functions doing three things,
    naming that lies, dead code, magic values.
 8. **Convention fit** — does this look like the rest of the codebase? Layering respected?
-9. **Test quality** — do the tests actually prove the acceptance criteria, or only that
-   the code runs? Tautological assertions, over-mocking, untested failure paths, missing
-   edge cases, tests coupled to implementation detail.
+9. **Test quality, against the approved plan** — read `06-test-plan/plan.md` and check the
+   cases assigned to this task. Does each named test assert what the plan says, or something
+   weaker that merely passes? A `TC` marked `implemented` with no real test behind it, or with an
+   assertion narrowed to fit the implementation, is a `blocker` — it defeats the purpose of
+   specifying tests up front. Then judge the tests on their own merits: tautological assertions,
+   over-mocking, untested failure paths, and tests coupled to implementation detail.
 10. **Documentation** — public interfaces documented, non-obvious decisions explained.
 
 ## Output
 
-Write `07-review/cycle-<n>/code-review.md`: findings grouped by severity, each with
+Write `08-review/cycle-<n>/code-review.md`: findings grouped by severity, each with
 `path:line`, what is wrong, the concrete failure scenario (inputs -> wrong outcome), why it
 matters, and a suggested direction. Then a short "what is solid" section and an explicit
 verdict line.

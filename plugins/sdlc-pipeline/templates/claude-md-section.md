@@ -32,7 +32,7 @@ phase work, and treat it as binding.
 - Findings from any source become `issues/ISSUE-NNN.md` with a severity and executable
   verification steps.
 - Defects whose cause is not obvious go to `sdlc-debugger` before anyone writes a fix, and
-  produce `10-investigations/INV-NNN.md` with a **proven** root cause.
+  produce `11-investigations/INV-NNN.md` with a **proven** root cause.
 - Decisions that are expensive to reverse become ADRs in `docs/adr/`.
 
 ## The cycle

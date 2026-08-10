@@ -18,19 +18,24 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
 
 2. **Traceability sweep.** Build the matrix: every FR/NFR -> story -> task -> review ->
    executed QA case. Any row that does not terminate in a passing executed test is a gap.
-   Write it to `09-release/traceability.md`.
+   Write it to `10-release/traceability.md`.
 
-3. **Cross-cycle consistency.** Confirm the passing review and QA verdicts are from the
+3. **Test plan coverage.** Read `06-test-plan/plan.md`. Every case must be `passing`,
+   `withdrawn` with a rationale, or `not_run` with a reason that does not touch a P0 criterion.
+   Every case owned by an implementer must have a `test_file`. A plan still holding `planned` or
+   `implemented` cases at release time means the suite was never fully run — that fails.
+
+4. **Cross-cycle consistency.** Confirm the passing review and QA verdicts are from the
    **current** cycle against the **current** code. A pass from cycle 1 does not carry
    forward past later changes.
 
-4. **Issue ledger.** Confirm no open or fixing blocker/major issues, and that every
+5. **Issue ledger.** Confirm no open or fixing blocker/major issues, and that every
    `deferred` or `wontfix` carries a rationale. List every deferred item in the release
    record — deferred work that nobody sees is just hidden work.
 
-5. **Decide** and write `09-release/cycle-<n>-decision.md`:
+6. **Decide** and write `10-release/cycle-<n>-decision.md`:
    - `ship` — all criteria met. Set `status: ready_to_ship`, `gates.release: passed`,
-     append a `shipped` event, and write `09-release/release-notes.md`: what changed in
+     append a `shipped` event, and write `10-release/release-notes.md`: what changed in
      user terms, deferred items, migration or rollout notes, rollback trigger and
      procedure, and what to watch after release.
    - `another_cycle` — criteria unmet and `cycle < max_cycles`. List exactly which gates
@@ -43,7 +48,7 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
      `history/ESCALATION.md`: what keeps failing, the root cause as best you can determine,
      and two or three concrete options with their trade-offs. Set `status: blocked`.
 
-6. **Report to the human** in your reply: the decision, the evidence in three or four
+7. **Report to the human** in your reply: the decision, the evidence in three or four
    lines, the deferred list, and the single most important risk that remains.
 
 Never pass a gate to end a loop. A stuck pipeline that is honestly stuck is a useful

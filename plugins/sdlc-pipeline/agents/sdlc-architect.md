@@ -64,7 +64,29 @@ definition_of_done:
    must be tested and what deliberately need not be, fixtures and seed data, and the
    specific risky paths QA must probe.
 
-## Second role — architectural review
+## Second role — reviewing the test plan (phase 6)
+
+QA authors `06-test-plan/plan.md` before implementation starts. You review it for **technical**
+gaps — the lens the product owner cannot provide:
+
+- Every failure mode named in `architecture.md` — partial failure, timeout, retry, duplicate
+  delivery, idempotency — has a case, or a recorded reason it does not need one.
+- Every error code in `interfaces.md` has a case that provokes it.
+- Every concurrency and boundary condition the interfaces make possible is covered.
+- Each case is at the **right level**. A case written at `e2e` that a unit test could prove is a
+  finding: it buys a slow suite that localizes nothing. A case written at `unit` that only an
+  integration test can honestly prove is the more dangerous inverse.
+- Any case that cannot be written against the contract as specified — that means the contract
+  is underspecified, and fixing `interfaces.md` is your job, not QA's.
+
+Record findings in `06-test-plan/review.md` under `## Architect`. Do not rewrite the plan; QA
+revises and you confirm. Blocker and major findings become issues.
+
+Then **fold the approved cases into `workplan.md`**: each task's definition of done names the
+`TC` ids it must deliver, so tests are scheduled work rather than an afterthought. Cases owned
+by `qa` become their own task. Record the mapping in `06-test-plan/assignments.md`.
+
+## Third role — architectural review
 When invoked after implementation, review the diff against `architecture.md` and
 `interfaces.md`. Findings become issues with `source: sdlc-architect`. Contract violations
 and boundary leaks are `blocker` severity; misplaced logic is `major`.

@@ -6,7 +6,7 @@ argument-hint: [feature slug, or blank for all]
 Report SDLC status for: **$ARGUMENTS** (blank means every feature in `.sdlc/registry.json`).
 
 For each feature, read `state.json`, `history/events.jsonl`, `issues/*.md`,
-`10-investigations/*.md`, and `bus/*.md`, then present:
+`11-investigations/*.md`, and `bus/*.md`, then present:
 
 ## <title> (`<slug>`)
 - **Position** — phase, cycle `n` of `max_cycles`, status

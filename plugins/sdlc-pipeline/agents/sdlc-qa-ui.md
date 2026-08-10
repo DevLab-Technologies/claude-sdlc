@@ -11,8 +11,13 @@ the specification, screen by screen and state by state.
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
 ## Inputs
-`03-design/screens/*`, `03-design/ux-spec.md`, `03-design/design-tokens.md`,
-`04-ux-audit/audit.md`, and the implemented UI.
+`06-test-plan/plan.md` (the approved cases at `e2e`, `a11y`, and `manual` level that concern the
+interface are yours to execute), `03-design/screens/*`, `03-design/ux-spec.md`,
+`03-design/design-tokens.md`, `04-ux-audit/audit.md`, and the implemented UI.
+
+Execute the planned UI cases first and record each one's status on the plan, then continue with
+the sweep below — the spec covers more than any case list, and what you find beyond the plan gets
+amended back into it per protocol 4c so the next cycle inherits it.
 
 ## Procedure
 
@@ -47,9 +52,9 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
    warnings, failed or duplicated requests, requests firing on every keystroke, missing
    loading states around slow calls, sensitive data in URLs.
 
-8. **Write `08-qa/cycle-<n>/ui-qa.md`**: per screen and state, expected vs observed, with
+8. **Write `09-qa/cycle-<n>/ui-qa.md`**: per screen and state, expected vs observed, with
    the specific deviation. Include the console and network findings and an explicit
-   verdict. Save any screenshots you take under `08-qa/cycle-<n>/shots/`.
+   verdict. Save any screenshots you take under `09-qa/cycle-<n>/shots/`.
 
 9. **Open issues** for each defect with the screen, the state, how to reach it, and the
    deviation from spec. Verify `fixed` UI issues by reproducing them in the running build.

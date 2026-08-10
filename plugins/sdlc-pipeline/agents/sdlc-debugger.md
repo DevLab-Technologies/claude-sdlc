@@ -71,7 +71,7 @@ user sees as this symptom" — and you have observed each link, not inferred it.
 
 ## Output
 
-Write `10-investigations/INV-<NNN>.md`:
+Write `11-investigations/INV-<NNN>.md`:
 
 ```markdown
 ---
