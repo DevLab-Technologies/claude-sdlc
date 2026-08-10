@@ -27,23 +27,14 @@ through the filesystem.
 
 ## Use it in your own projects
 
-### 1. Publish this repository
+Published at **https://github.com/DevLab-Technologies/claude-sdlc**. The marketplace is named
+`miza-sdlc`, which is the name after the `@` when installing — it is independent of the
+repository name.
 
-Push it to a git host your team can reach. It works from GitHub, GitLab, Bitbucket, or a
-plain git URL, public or private.
-
-```bash
-cd /Users/elkhayyat/Dev/SDLC && git init && git add . && git commit -m "Add SDLC pipeline plugin and marketplace"
-```
+### 1. Add the marketplace once, per machine
 
 ```bash
-gh repo create your-org/claude-sdlc --private --source . --push
-```
-
-### 2. Add the marketplace once, per machine
-
-```bash
-claude plugin marketplace add your-org/claude-sdlc
+claude plugin marketplace add DevLab-Technologies/claude-sdlc
 ```
 
 ```bash
@@ -53,14 +44,14 @@ claude plugin install sdlc-pipeline@miza-sdlc
 Both are available as `/plugin marketplace add …` and `/plugin install …` inside an
 interactive session. The plugin is now available in **every** project on that machine.
 
-To try it before publishing, add the local directory instead — it picks up your edits as you
-make them, which is the right setup while you are still tuning the agents:
+To develop against your working copy instead, add the local directory — it picks up your edits
+as you make them, which is the right setup while you are still tuning the agents:
 
 ```bash
 claude plugin marketplace add /Users/elkhayyat/Dev/SDLC
 ```
 
-### 3. Initialize each project
+### 2. Initialize each project
 
 From inside a project you want to run the pipeline in:
 
@@ -89,15 +80,16 @@ Then start work:
 Send them two commands:
 
 ```bash
-claude plugin marketplace add your-org/claude-sdlc
+claude plugin marketplace add DevLab-Technologies/claude-sdlc
 ```
 
 ```bash
 claude plugin install sdlc-pipeline@miza-sdlc
 ```
 
-Private repository access uses their existing git credentials — `gh auth login`, the macOS
-Keychain, or an SSH key already in `ssh-agent` all work without extra setup.
+The repository is public, so no credentials are needed. If you later make it private, access
+uses each person's existing git credentials — `gh auth login`, the macOS Keychain, or an SSH
+key already in `ssh-agent` all work without extra setup.
 
 ### Option B — per project, automatic (recommended for a team)
 
@@ -110,7 +102,7 @@ is prompted to install the marketplace, and the plugin is enabled for them:
     "miza-sdlc": {
       "source": {
         "source": "github",
-        "repo": "your-org/claude-sdlc"
+        "repo": "DevLab-Technologies/claude-sdlc"
       }
     }
   },
@@ -147,15 +139,17 @@ active development, remove the `version` field from
 [`plugin.json`](plugins/sdlc-pipeline/.claude-plugin/plugin.json) and the marketplace entry —
 then every push reaches the team on their next update.
 
-## Before you commit
+## Maintaining it
 
-Replace the placeholder identity in two files: `owner` in
-[`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) and `author` in
-[`plugin.json`](plugins/sdlc-pipeline/.claude-plugin/plugin.json). The marketplace name
-`miza-sdlc` is what your team types after the `@`, so change it before anyone installs —
-renaming it later means every install has to be redone.
+The marketplace name `miza-sdlc` is what your team types after the `@`. Renaming it means
+every existing install has to be redone, so settle it before the team adopts it. The same
+applies to the plugin name `sdlc-pipeline` — it keys `enabledPlugins` and `pluginConfigs`.
 
-Validate before pushing:
+This repository is **public**. It carries the maintainer email in both manifests, and the gate
+criteria in the `sdlc-protocol` skill are effectively the team's internal quality standards —
+worth a read before pointing anyone outside the org at it.
+
+Always validate before pushing; a malformed manifest breaks the install for everyone:
 
 ```bash
 claude plugin validate ./plugins/sdlc-pipeline
