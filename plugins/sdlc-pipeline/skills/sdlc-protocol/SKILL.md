@@ -488,6 +488,18 @@ There is no locking here, and adding some would be worse than the constraint.
   since changed is worthless.
 - **The release gate**, always last and alone. It audits everyone else's output.
 
+### Reviews outside a feature workspace
+
+`/sdlc-review` can run on a bare diff, branch, or PR with no feature behind it. Those outputs go to
+`.sdlc/reviews/<date>-<target>/` using the same file-per-lens layout, and there is no gate to set —
+the merged verdict is the deliverable.
+
+Standalone reviews are **weaker by construction** and must say so: with no stories there are no
+acceptance criteria for requirement fidelity to check, and with no approved test plan the test lens
+can only judge tests against the code's apparent intent. Both must state that in `## Not covered`.
+A standalone review implying it verified requirements is a false signal, which is worse than an
+absent one.
+
 ### Launching a parallel group
 
 Launch the whole group in **one** message so they actually run concurrently rather than in

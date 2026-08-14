@@ -10,13 +10,16 @@ This repository is a **Claude Code plugin marketplace**. The plugin lives in
 
 ## What you get
 
-Eighteen commands and agents, coordinating through a durable filesystem workspace:
+Nineteen commands and agents, coordinating through a durable filesystem workspace:
 
 - `/sdlc <request>` — the full pipeline: intake, research, PRD and stories, UX design, UX
   audit, architecture with ADRs, a reviewed test plan written before the code, implementation,
   review, functional QA, UI QA, release gate
 - `/sdlc-bug <report>` — the root-cause path: reproduce, prove the cause, fix the cause, add
   a regression test, verify, sweep the blast radius
+- `/sdlc-review [target]` — the whole review phase in one command: verify once, five lenses in
+  parallel, then merge, deduplicate, fix mechanically, and sign off. Works on a feature slug, a
+  branch, a PR number, a path, or the working diff
 - `/sdlc-status [slug]` — position, gates, issues, investigations, and the next action
 - `/sdlc-init` — set up a project and learn its conventions
 

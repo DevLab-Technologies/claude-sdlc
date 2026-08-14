@@ -67,7 +67,8 @@ Rules for the sequence:
 - **Keep functional QA and UI QA sequential.** They share one running app and one dataset, and
   functional QA mutates data that UI QA then observes. Only run them concurrently if each gets a
   genuinely isolated environment, and record that you did.
-- **Phase 8 is a fan-out in three steps**, and the order is what makes it safe:
+- **Phase 8 is a fan-out in three steps**, and the order is what makes it safe. `/sdlc-review`
+  runs exactly this sequence standalone if you need to re-run review alone:
   1. `sdlc-review-lead` in **verify mode** — runs build, lint, type check, suite, and a smoke
      test **once**, checks the implementer's claims, and writes `verification.md`. If the build
      is unusable it stops here; five reviewers reading broken code produce five reports about the

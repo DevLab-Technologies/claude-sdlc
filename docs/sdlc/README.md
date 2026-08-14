@@ -78,7 +78,8 @@ being rediscovered each cycle.
 ## Review is five lenses in parallel, bracketed by a lead
 
 One reviewer doing six jobs sequentially is slower and shallower than specialists doing one each.
-Phase 8 runs in three steps:
+Phase 8 runs in three steps, and `/sdlc-review` runs the same three standalone — on a feature slug,
+a branch, a PR number, a path, or just the working diff:
 
 1. **Verify, once.** `sdlc-review-lead` runs build, lint, type check, suite, and a smoke test of
    the primary path, then checks the implementer's claimed verification against what actually

@@ -10,6 +10,7 @@ implementation, and verification, and it leaves as reviewed, tested, traceable w
 |---|---|
 | `/sdlc <request>` | A new feature, from scratch through release gate |
 | `/sdlc-bug <report>` | A defect — root-cause path with the verification gates intact |
+| `/sdlc-review [target]` | The full parallel review alone — a feature, branch, PR, path, or working diff |
 | `/sdlc-status [slug]` | Where everything stands and what runs next |
 | `/sdlc-init` | Re-run after the project's stack or commands change |
 
