@@ -48,7 +48,7 @@ flowchart TD
 | `sdlc-architect` | Architecture, interface contracts, ADRs, workplan, test-plan technical review | Write feature code |
 | `sdlc-implementer` | Code and tests for one task, or one fix set | Redefine scope or contract |
 | `sdlc-debugger` | Reproduction, isolation, **proven** root cause, blast radius | Implement the fix |
-| `sdlc-code-reviewer` | Correctness, security, clean code, test quality | Fix what it finds |
+| `sdlc-code-reviewer` | Requirement fidelity, correctness, security, test honesty; runs the build and smoke-tests; fixes mechanical issues; signs off on review | Fix logic, security, or tests — or declare ship-readiness |
 | `sdlc-qa-functional` | The test plan (before code), execution, defect reports, fix verification | Pass on inspection alone |
 | `sdlc-qa-ui` | The running interface vs the spec, responsive, a11y, console | Review UI it cannot run |
 | `sdlc-release-gate` | The ship / cycle / escalate decision, traceability | Pass a gate to end a loop |
@@ -68,6 +68,26 @@ a test narrowed to fit the implementation is a blocker.
 This ordering is the difference between finding edge cases as rework and building them in. What
 QA discovers during execution is amended back into the plan, so coverage accumulates instead of
 being rediscovered each cycle.
+
+## Review verifies by running, and signs off within its scope
+
+The reviewer reads the intent before the diff — stories, assumptions, contracts, the test plan,
+the design spec — then **runs** the build, lint, type check, and suite, and smoke-tests the
+primary path. It checks the implementer's claimed verification against what actually happens; a
+claim of passing tests that do not pass is a blocker, because downstream agents were handed
+false information.
+
+It has **bounded fix authority**. Mechanical issues (typos, dead code, misleading names, obvious
+duplication) it fixes inline and lists in a `## Fixed inline` section. Anything touching logic,
+control flow, data, security, concurrency, contracts, or test assertions goes back to the
+implementer — because an agent that fixes a logic defect becomes its author, and no independent
+judge of that logic remains.
+
+Every verification agent ends with a sign-off naming its verdict, what it ran, what it verified,
+and **what it could not verify and why**. That last line is what makes the sign-off honest. Each
+sign-off is scoped to its own gate: only the release gate declares ship-readiness, and it does so
+by auditing the others — including checking that no sign-off is stale after a later code change,
+and that nobody signed off on work they authored.
 
 ## Debugging path in detail
 

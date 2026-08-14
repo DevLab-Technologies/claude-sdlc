@@ -20,6 +20,12 @@ Fourteen commands and agents, coordinating through a durable filesystem workspac
 - `/sdlc-status [slug]` — position, gates, issues, investigations, and the next action
 - `/sdlc-init` — set up a project and learn its conventions
 
+Review reads the intent before the diff, runs the build and suite to check the implementer's
+claims rather than trusting them, fixes mechanical issues inline, and signs off with what it
+could **not** verify stated explicitly. Logic, security, and test assertions always go back to
+the implementer — an agent that fixes a defect becomes its author, and no independent judge
+remains.
+
 See [docs/sdlc/README.md](docs/sdlc/README.md) for the flow diagram and the role table, and
 [ADR-0001](docs/adr/0001-filesystem-as-agent-communication-bus.md) for why agents coordinate
 through the filesystem.

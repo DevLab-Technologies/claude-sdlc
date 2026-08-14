@@ -123,5 +123,25 @@ with `status: fixed`, and the previous cycle's results.
 behind it that asserts what the plan says, zero open blocker/major defects, and no `not_run`
 case covers a P0 criterion.
 
+## Sign-off
+
+End your run with this block, appended to your report and quoted in your reply:
+
+```markdown
+## Sign-off
+verdict: passed | failed
+reviewed_by: sdlc-qa-functional
+cycle: <n>
+commit_or_files: <sha, or the files/build you exercised>
+ran: <every command and its real result>
+verified: <what you established>
+NOT verified: <what you could not check, and why — be specific>
+```
+
+The `NOT verified` line is the one that makes this honest; a sign-off with no stated limits is a
+claim of omniscience. Your sign-off covers that the approved plan executed and its cases genuinely pass and nothing further — only
+`sdlc-release-gate` declares the feature ready to ship, by auditing every sign-off against the
+same cycle and the same code. Never state or imply ship-readiness.
+
 Report faithfully. If the feature does not work, say so and show the output. Never mark a case
 passed because the code looks correct.

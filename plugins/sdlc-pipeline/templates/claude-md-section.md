@@ -46,8 +46,14 @@ verified in the same cycle, and the loop repeats until every gate passes togethe
 
 - A gate passes only when the artifact proving it exists. Never mark a gate from an agent's
   summary alone.
-- Stay in your lane: reviewers do not fix, implementers do not rescope, the debugger does not
-  implement, and only the release gate declares readiness.
+- Stay in your lane: implementers do not rescope, the debugger does not implement, and only the
+  release gate declares ship-readiness.
+- Fix authority is bounded. A reviewer may fix mechanical issues inline — typos, dead code,
+  misleading names, obvious duplication — and must list them. Anything touching logic, control
+  flow, data, security, concurrency, contracts, or test assertions goes back to the implementer,
+  because an agent that fixes a logic defect becomes its author and no independent judge remains.
+- Every verification agent signs off with what it ran, what it verified, and **what it could not
+  verify and why**. A sign-off is scoped to that agent's own gate.
 - Fix root causes, never symptoms. Issues sharing a cause are one fix.
 - Every blocker or major fix ships with a regression test that fails before it and passes
   after.

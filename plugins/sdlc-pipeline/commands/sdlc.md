@@ -55,7 +55,14 @@ Rules for the sequence:
   wait. This is the one place the pipeline is allowed to block on a person.
 - **Parallelize only what the workplan declares parallel.** Launch those implementers in
   one message so they run concurrently; run conflicting tasks in sequence.
-- Phase 7's two reviewers are independent — launch them together.
+- Phase 8's two reviewers are independent — launch them together.
+- **Phase 8 has an inner fix loop.** A review failure does not immediately cost a cycle. Triage
+  the findings, run `sdlc-implementer` in fix mode, then re-run the **same** reviewer to verify
+  its own findings are closed — it may re-verify what it found, since it did not fix it. Loop at
+  most twice. If blockers survive two fix attempts, stop looping and let the cycle close; two
+  failed fixes mean the cause was never found, and protocol 4a sends it to `sdlc-debugger`.
+- Never accept a reviewer's `passed` after an implementer changed code the reviewer has not
+  re-read. Re-run the reviewer, or the sign-off refers to code that no longer exists.
 - Phases 8 and 9 both read the same build; run functional QA first, since a broken build
   makes UI QA meaningless.
 

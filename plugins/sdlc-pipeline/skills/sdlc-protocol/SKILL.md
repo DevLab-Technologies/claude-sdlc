@@ -368,7 +368,9 @@ the two or three options the human must choose between.
   guessed command produces a false failure, which is worse than no result. If the file is
   missing, say so and tell the human to run `/sdlc-init`.
 - Read `state.json` and your input artifacts first. Never invent an input you could read.
-- Stay in your lane. A reviewer does not fix code. An implementer does not redefine scope.
+- Stay in your lane, and know where the lane's edge is. See section 8a on fix authority. An
+  implementer does not redefine scope; a designer does not change requirements; only the
+  release gate declares ship-readiness.
 - Write files, not just prose in your reply. Your reply is a summary; the files are the work.
 - Be concrete and falsifiable. "Improve error handling" is not a finding; a file, a line,
   a trigger, and a consequence is.
@@ -376,3 +378,42 @@ the two or three options the human must choose between.
 - Idempotence: if your output already exists for this cycle, revise it in place rather
   than duplicating.
 - Never mention tooling or AI assistance in any artifact, commit, or document.
+
+## 8a. Fix authority — who may change code, and why the line sits there
+
+The line is not about difficulty. It is about whether an independent judge survives the change.
+An agent that fixes a logic defect becomes that logic's author, and there is no longer anyone
+positioned to say whether it is right.
+
+| Finding | Who may fix it |
+|---|---|
+| `nit`, and mechanical `minor` with one obvious correct form | the reviewer who found it, inline |
+| Anything touching logic, control flow, or data | `sdlc-implementer` only |
+| `blocker` or `major`, any category | `sdlc-implementer` only, no exceptions |
+| Security, concurrency, contract deviation | `sdlc-implementer`, after the architect rules on contract questions |
+| A weak or missing test | the implementer who owed the `TC` — never the reviewer, or nobody independent judges it |
+| Cause unproven | nobody, until `sdlc-debugger` proves it |
+
+Mechanical means: typos, comments, formatting, import order, dead code, unused variables,
+misleading names, magic values wanting a constant, duplication with one obvious extraction.
+
+Any agent fixing inline must list every change in a `## Fixed inline` section with the file and
+why it was mechanical, then re-run the build and suite. If your fix breaks anything, revert it
+and open an issue — an inline fix must never be the reason a gate fails.
+
+## 8b. Sign-off — scoped, evidenced, and never self-certified
+
+Every verification agent ends its run with a sign-off block naming its verdict, exactly what it
+ran, what it verified, and **what it could not verify and why**. The last line is the one that
+makes a sign-off honest; a sign-off with no stated limits is a claim of omniscience.
+
+A sign-off is scoped to that agent's own gate and nothing further:
+- `sdlc-code-reviewer` signs off that the code is correct and is what was specified.
+- `sdlc-qa-functional` signs off that the approved plan executed and the cases genuinely pass.
+- `sdlc-qa-ui` signs off that the interface matches the spec across its states.
+- **Only `sdlc-release-gate` signs off that the feature is ready to ship**, and only by auditing
+  the other sign-offs plus the traceability matrix — all from the same cycle against the same
+  code.
+
+No agent may declare or imply ship-readiness outside its scope, and no agent signs off on work
+it changed itself beyond mechanical fixes.

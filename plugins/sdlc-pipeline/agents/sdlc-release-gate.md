@@ -25,9 +25,19 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
    Every case owned by an implementer must have a `test_file`. A plan still holding `planned` or
    `implemented` cases at release time means the suite was never fully run — that fails.
 
-4. **Cross-cycle consistency.** Confirm the passing review and QA verdicts are from the
-   **current** cycle against the **current** code. A pass from cycle 1 does not carry
-   forward past later changes.
+4. **Cross-cycle consistency, and the sign-offs themselves.** Confirm the passing review and QA
+   verdicts are from the **current** cycle against the **current** code. A pass from cycle 1 does
+   not carry forward past later changes.
+
+   Read each agent's `## Sign-off` block, and read the `NOT verified` line hardest — that is
+   where the real risk is declared. An unverified area that touches a P0 criterion is a gap, not
+   a footnote. Check the `commit_or_files` on each sign-off actually matches the code as it now
+   stands; if an implementer changed code after a reviewer signed off, that sign-off is stale and
+   the gate fails until the reviewer re-runs.
+
+   Also confirm no agent signed off on work it authored beyond mechanical fixes. Read the
+   `## Fixed inline` sections: anything there touching logic, security, or a test assertion is a
+   protocol violation and a `blocker`, regardless of whether the code now works.
 
 5. **Issue ledger.** Confirm no open or fixing blocker/major issues, and that every
    `deferred` or `wontfix` carries a rationale. List every deferred item in the release
