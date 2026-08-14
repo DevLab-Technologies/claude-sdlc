@@ -36,7 +36,7 @@ trust the artifacts, not the agent's summary — and only then proceed.
 | 5 | `sdlc-architect` | architecture |
 | 6 | `sdlc-qa-functional` (plan mode) -> `sdlc-architect` + `sdlc-product-owner` review -> QA revises and approves | test-plan |
 | 7 | `sdlc-implementer` — one instance per workplan task, writing its assigned `TC` cases | implementation |
-| 8 | `sdlc-code-reviewer` + `sdlc-architect` (compliance review) | review |
+| 8 | `sdlc-review-lead` (verify) -> **five lenses in parallel** -> `sdlc-review-lead` (synthesize) | review |
 | 9 | `sdlc-qa-functional` (execute mode) | qa |
 | 10 | `sdlc-qa-ui` (skip if no UI) | ui-qa |
 | 11 | `sdlc-release-gate` | release |
@@ -53,9 +53,35 @@ Rules for the sequence:
   failure mode this phase exists to prevent.
 - **Intake blocking questions stop everything.** Present them to the human verbatim and
   wait. This is the one place the pipeline is allowed to block on a person.
-- **Parallelize only what the workplan declares parallel.** Launch those implementers in
-  one message so they run concurrently; run conflicting tasks in sequence.
-- Phase 8's two reviewers are independent — launch them together.
+- **Parallelize wherever protocol section 9 permits, and nowhere else.** Read that section before
+  launching any group; it names the four hazards (id races, concurrent edits, shared runtime
+  resources, shared state) and the rule that neutralizes each. Every parallel group gets launched
+  in **one message** — separate messages run in sequence and you lose the entire benefit.
+  - Phase 1: the research sweeps (internal code, external prior art, constraints) can fan out.
+  - Phase 6: the architect and product owner review the plan concurrently.
+  - Phase 7: implementers for tasks the workplan declares `parallel_with`; run conflicting tasks
+    in sequence.
+  - Phase 8: the five review lenses.
+  - Triage: one debugger per distinct symptom cluster.
+  - Fix mode: implementers grouped so no two touch the same file.
+- **Keep functional QA and UI QA sequential.** They share one running app and one dataset, and
+  functional QA mutates data that UI QA then observes. Only run them concurrently if each gets a
+  genuinely isolated environment, and record that you did.
+- **Phase 8 is a fan-out in three steps**, and the order is what makes it safe:
+  1. `sdlc-review-lead` in **verify mode** — runs build, lint, type check, suite, and a smoke
+     test **once**, checks the implementer's claims, and writes `verification.md`. If the build
+     is unusable it stops here; five reviewers reading broken code produce five reports about the
+     same thing.
+  2. **All five lenses in one message**, so they genuinely run concurrently:
+     `sdlc-code-reviewer` (correctness + requirement fidelity), `sdlc-review-security`,
+     `sdlc-review-performance`, `sdlc-review-tests`, and `sdlc-architect` (compliance). Tell each
+     one its lens, the file it owns, and its local id prefix. None of them runs a server, runs the
+     suite, edits code, or allocates issue ids — that is what the bracketing lead is for.
+  3. `sdlc-review-lead` in **synthesize mode** — merges and deduplicates across lenses, resolves
+     severity conflicts upward, allocates the global `ISSUE` ids, applies mechanical fixes
+     sequentially, finds the cross-cutting patterns no single lens could see, and signs off.
+- Wait for **all five** before synthesizing. A missing lens must be recorded as `not run`, never
+  silently treated as clean.
 - **Phase 8 has an inner fix loop.** A review failure does not immediately cost a cycle. Triage
   the findings, run `sdlc-implementer` in fix mode, then re-run the **same** reviewer to verify
   its own findings are closed — it may re-verify what it found, since it did not fix it. Loop at

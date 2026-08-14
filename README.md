@@ -10,7 +10,7 @@ This repository is a **Claude Code plugin marketplace**. The plugin lives in
 
 ## What you get
 
-Fourteen commands and agents, coordinating through a durable filesystem workspace:
+Eighteen commands and agents, coordinating through a durable filesystem workspace:
 
 - `/sdlc <request>` — the full pipeline: intake, research, PRD and stories, UX design, UX
   audit, architecture with ADRs, a reviewed test plan written before the code, implementation,
@@ -20,11 +20,13 @@ Fourteen commands and agents, coordinating through a durable filesystem workspac
 - `/sdlc-status [slug]` — position, gates, issues, investigations, and the next action
 - `/sdlc-init` — set up a project and learn its conventions
 
-Review reads the intent before the diff, runs the build and suite to check the implementer's
-claims rather than trusting them, fixes mechanical issues inline, and signs off with what it
-could **not** verify stated explicitly. Logic, security, and test assertions always go back to
-the implementer — an agent that fixes a defect becomes its author, and no independent judge
-remains.
+Work runs in parallel wherever it is genuinely independent: the research sweeps, the two
+test-plan reviewers, implementers on file-disjoint tasks, one debugger per symptom cluster, and
+**five review lenses at once** — correctness, security, performance, test honesty, and
+architectural compliance. A review lead brackets that fan-out: it runs the build and suite once so
+five agents do not collide on ports and fixtures, then merges the lenses, deduplicates findings
+that share a cause, allocates issue ids, and signs off with what nobody verified stated
+explicitly.
 
 See [docs/sdlc/README.md](docs/sdlc/README.md) for the flow diagram and the role table, and
 [ADR-0001](docs/adr/0001-filesystem-as-agent-communication-bus.md) for why agents coordinate
@@ -183,7 +185,8 @@ Edit them — that is the point.
 
 - Swap `sdlc-implementer` for a stack specialist and keep the sections on contracts,
   verification, and the task record.
-- Add a security phase by running your auditor alongside `sdlc-code-reviewer` in phase 8.
+- Add a review lens by writing one agent file and adding it to the phase 8 fan-out — it inherits
+  the parallel constraints from protocol section 9.
 - Tune `max_cycles` per feature in `state.json`; lower it for exploratory work so it
   escalates sooner.
 - The gate criteria in the `sdlc-protocol` skill are where a team's real standards belong.

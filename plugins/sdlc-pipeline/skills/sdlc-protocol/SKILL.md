@@ -50,8 +50,13 @@ Every feature gets one directory: `.sdlc/features/<slug>/`
     TASK-001.md           # per-task record: files touched, decisions, deviations
     handoff.md            # what QA and review need to know
   08-review/
-    cycle-<n>/code-review.md
-    cycle-<n>/security-review.md
+    cycle-<n>/verification.md    # build, suite, smoke — run ONCE by the lead, before fan-out
+    cycle-<n>/correctness.md     # one file per parallel lens, local finding ids
+    cycle-<n>/security.md
+    cycle-<n>/performance.md
+    cycle-<n>/tests.md
+    cycle-<n>/compliance.md      # architect
+    cycle-<n>/review-summary.md  # lead: merged findings, global ids, verdict, sign-off
   09-qa/
     cycle-<n>/functional-qa.md   # execution of the approved plan
     cycle-<n>/ui-qa.md
@@ -417,3 +422,78 @@ A sign-off is scoped to that agent's own gate and nothing further:
 
 No agent may declare or imply ship-readiness outside its scope, and no agent signs off on work
 it changed itself beyond mechanical fixes.
+
+## 9. Parallel execution
+
+Agents run concurrently wherever the work is genuinely independent. Concurrency is not free
+though: several agents sharing one filesystem, one port range, and one database will corrupt each
+other's work in ways that are hard to see afterward. These rules are what make it safe.
+
+### The four hazards, and the rule for each
+
+**1. Id allocation races.** Two agents that both read "the highest issue is ISSUE-010" both write
+`ISSUE-011`, and one silently overwrites the other.
+
+> Agents in a parallel group **never allocate global ids**. They emit findings with local,
+> prefixed ids — `CORR-1`, `SEC-3`, `PERF-2`, `TEST-5`, `ARCH-1` — in their own report. A single
+> synthesizing agent afterward assigns `ISSUE-<NNN>` numbers and records the local-to-global map.
+
+**2. Concurrent edits to one tree.** Two agents applying fixes to the same file, or to files that
+import each other, produce a state neither intended and a build that fails for no attributable
+reason.
+
+> Only **one** agent applies edits per phase. In review that is the lead; in implementation it is
+> each implementer within its declared file boundary. Parallel reviewers propose fixes and never
+> apply them.
+
+**3. Shared runtime resources.** Four agents each starting the dev server fight over the port;
+each seeding fixtures destroys the others' expected data; four suite runs is three wasted.
+
+> Verification runs **once**, before the fan-out, and its output is written to a file the parallel
+> agents read. No agent in a parallel group starts a server, seeds data, or runs the suite. An
+> agent needing a measurement nobody took records that in `## Not covered` rather than taking it.
+
+**4. Concurrent writes to shared state.** `state.json` written by two agents at once loses one of
+them entirely.
+
+> Only the phase's owning agent touches `state.json` and gates. Parallel members write their own
+> report and nothing else. `history/events.jsonl` accepts concurrent single-line appends — one
+> line, one write, never a rewrite of the file.
+
+### File ownership under fan-out
+
+Every parallel agent writes exactly one file, named for its lens, and reads freely. If two agents
+could write the same path, the design is wrong — split the path, do not coordinate at runtime.
+There is no locking here, and adding some would be worse than the constraint.
+
+### What is safely parallel
+
+| Phase | Parallel work | Why it is safe |
+|---|---|---|
+| 1 research | internal-code, external prior-art, and constraints sweeps | read-only, separate output files |
+| 6 test plan review | architect and product owner | independent lenses, separate sections |
+| 7 implementation | tasks the workplan declares `parallel_with` | file-level disjoint by construction |
+| 8 review | correctness, security, performance, tests, compliance | read-only, one report each, verification pre-run |
+| defect triage | one investigation per distinct symptom cluster | separate `INV` files, read-only analysis |
+| fix mode | implementers grouped so no two touch one file | boundaries declared before launch |
+
+### What must stay sequential, and why
+
+- **Anything mutating shared state**: gates, `state.json`, id allocation, applying fixes.
+- **Functional QA and UI QA** share one running application and one dataset. Functional QA seeds
+  and mutates data that UI QA then observes, so running them concurrently makes both unreliable.
+  Run them in sequence unless each has a genuinely isolated environment — and if you isolate them,
+  say so in the run record so the results are interpretable.
+- **A reviewer re-verifying after a fix.** The fix must land first; a review of code that has
+  since changed is worthless.
+- **The release gate**, always last and alone. It audits everyone else's output.
+
+### Launching a parallel group
+
+Launch the whole group in **one** message so they actually run concurrently rather than in
+sequence. Give each member: the slug, the phase, the cycle, its lens, the exact file it owns, and
+the local id prefix it must use. Then wait for all of them before synthesizing — a synthesis
+missing a lens is worse than a late one, because the gap is invisible in the result.
+
+If a member fails or returns nothing, the synthesizer records that lens as **not run**. An
+unexamined angle is not a clean angle, and a sign-off must never imply otherwise.

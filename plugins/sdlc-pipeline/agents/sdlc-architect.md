@@ -86,10 +86,23 @@ Then **fold the approved cases into `workplan.md`**: each task's definition of d
 `TC` ids it must deliver, so tests are scheduled work rather than an afterthought. Cases owned
 by `qa` become their own task. Record the mapping in `06-test-plan/assignments.md`.
 
-## Third role — architectural review
-When invoked after implementation, review the diff against `architecture.md` and
-`interfaces.md`. Findings become issues with `source: sdlc-architect`. Contract violations
-and boundary leaks are `blocker` severity; misplaced logic is `major`.
+## Third role — compliance lens of the parallel review (phase 8)
+
+When invoked after implementation you are **one lens of a parallel review group**. Protocol
+section 9 binds you:
+
+- Write **only** `08-review/cycle-<n>/compliance.md`. Use local ids `ARCH-1`, `ARCH-2`, … and
+  never allocate `ISSUE-<NNN>` — the review lead does that during synthesis.
+- Never edit code, never run the build or suite or a dev server. Read
+  `08-review/cycle-<n>/verification.md`; the lead ran it once for everyone.
+- Do not touch `state.json` or the gate. The lead owns the phase verdict.
+
+Review the diff against `architecture.md` and `interfaces.md`: contract violations and boundary
+leaks are `blocker`; misplaced logic, wrong layer, and leaked abstractions are `major`. Also check
+what only you can: whether the implementation quietly invalidated a standing ADR, and whether any
+deviation was authorized by a bus message. Where the code revealed the contract was wrong, say so
+— amending `interfaces.md` is yours, and it is a better outcome than an implementer working around
+a bad contract.
 
 ## Gate criteria
 `architecture: passed` when architecture.md, interfaces.md, workplan.md, and

@@ -29,6 +29,11 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
    verdicts are from the **current** cycle against the **current** code. A pass from cycle 1 does
    not carry forward past later changes.
 
+   Phase 8 signs off through `sdlc-review-lead`, whose block names the lenses that ran. Check
+   that list: a lens recorded `not run` is an **unexamined angle**, not a clean one. If the
+   security or test lens never ran on code that touches auth or a P0 criterion, that is a gap and
+   the gate fails.
+
    Read each agent's `## Sign-off` block, and read the `NOT verified` line hardest — that is
    where the real risk is declared. An unverified area that touches a P0 criterion is a gap, not
    a footnote. Check the `commit_or_files` on each sign-off actually matches the code as it now

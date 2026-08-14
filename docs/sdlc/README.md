@@ -17,12 +17,14 @@ flowchart TD
     TP --> TPR[architect + product owner<br/>adversarial edge-case review]
     TPR -->|gaps| TP
     TPR --> IMPL[implementers<br/>one per task, writing their assigned TC cases]
-    IMPL --> REV[code reviewer + architect compliance]
-    REV --> QA[functional QA]
+    IMPL --> RV[review lead: verify once<br/>build + suite + smoke + claim check]
+    RV --> REV[5 lenses in parallel<br/>correctness · security · performance<br/>tests · compliance]
+    REV --> RS[review lead: synthesize<br/>merge, dedupe, allocate ids, sign off]
+    RS --> QA[functional QA]
     QA --> UIQA[UI QA]
     QA -.->|new cases found| TP
     UIQA --> GATE{release gate}
-    REV -->|findings| TRI[triage]
+    RS -->|findings| TRI[triage]
     QA -->|defects| TRI
     UIQA -->|defects| TRI
     TRI -->|cause obvious| FIX[implementer fix mode]
@@ -30,7 +32,7 @@ flowchart TD
     TRI -->|contract violation| ARCH
     TRI -->|spec is wrong| PO
     DBG -->|root cause + regression test| FIX
-    FIX --> REV
+    FIX --> RV
     GATE -->|another cycle| IMPL
     GATE -->|escalate| ESC[ESCALATION.md<br/>options for the human]
     GATE -->|ship| DONE[release notes + traceability]
@@ -48,7 +50,11 @@ flowchart TD
 | `sdlc-architect` | Architecture, interface contracts, ADRs, workplan, test-plan technical review | Write feature code |
 | `sdlc-implementer` | Code and tests for one task, or one fix set | Redefine scope or contract |
 | `sdlc-debugger` | Reproduction, isolation, **proven** root cause, blast radius | Implement the fix |
-| `sdlc-code-reviewer` | Requirement fidelity, correctness, security, test honesty; runs the build and smoke-tests; fixes mechanical issues; signs off on review | Fix logic, security, or tests — or declare ship-readiness |
+| `sdlc-review-lead` | Running verification once, merging the lenses, global issue ids, mechanical fixes, the review verdict | Review a lens itself, or declare ship-readiness |
+| `sdlc-code-reviewer` | Requirement fidelity, correctness, contracts, clean code | Run servers, edit code, allocate issue ids |
+| `sdlc-review-security` | Authorization, injection, secrets, exposure, unsafe operations | Soften a finding because the fix is costly |
+| `sdlc-review-performance` | N+1 access, unboundedness, indexes, timeouts, payload cost | Demand speculative optimization |
+| `sdlc-review-tests` | Whether each test asserts what the plan required | Rewrite a test it judges |
 | `sdlc-qa-functional` | The test plan (before code), execution, defect reports, fix verification | Pass on inspection alone |
 | `sdlc-qa-ui` | The running interface vs the spec, responsive, a11y, console | Review UI it cannot run |
 | `sdlc-release-gate` | The ship / cycle / escalate decision, traceability | Pass a gate to end a loop |
@@ -69,19 +75,34 @@ This ordering is the difference between finding edge cases as rework and buildin
 QA discovers during execution is amended back into the plan, so coverage accumulates instead of
 being rediscovered each cycle.
 
-## Review verifies by running, and signs off within its scope
+## Review is five lenses in parallel, bracketed by a lead
 
-The reviewer reads the intent before the diff — stories, assumptions, contracts, the test plan,
-the design spec — then **runs** the build, lint, type check, and suite, and smoke-tests the
-primary path. It checks the implementer's claimed verification against what actually happens; a
-claim of passing tests that do not pass is a blocker, because downstream agents were handed
-false information.
+One reviewer doing six jobs sequentially is slower and shallower than specialists doing one each.
+Phase 8 runs in three steps:
 
-It has **bounded fix authority**. Mechanical issues (typos, dead code, misleading names, obvious
-duplication) it fixes inline and lists in a `## Fixed inline` section. Anything touching logic,
-control flow, data, security, concurrency, contracts, or test assertions goes back to the
-implementer — because an agent that fixes a logic defect becomes its author, and no independent
-judge of that logic remains.
+1. **Verify, once.** `sdlc-review-lead` runs build, lint, type check, suite, and a smoke test of
+   the primary path, then checks the implementer's claimed verification against what actually
+   happened — a claim of passing tests that do not pass is a blocker, because downstream agents
+   were handed false information. Result goes in `verification.md`. If the build is unusable it
+   stops here rather than fanning out five reports about one broken compile.
+
+2. **Five lenses concurrently**, each reading that verification instead of re-running anything:
+   correctness and requirement fidelity, security, performance, test honesty, and architectural
+   compliance. Each writes one file and emits **local** finding ids (`SEC-3`, `PERF-2`) because
+   concurrent global id allocation races.
+
+3. **Synthesize.** The lead merges and deduplicates — one unbounded query is a correctness,
+   performance, and denial-of-service finding, and it becomes one issue naming all three lenses.
+   Severity conflicts resolve upward with both positions recorded. It then allocates the global
+   `ISSUE` ids, applies mechanical fixes sequentially, and looks for the cross-cutting pattern no
+   single lens could see: several findings sharing one root cause, or a subsystem drawing findings
+   from every lens that needs rework rather than patches.
+
+**Fix authority is bounded and singular.** Only the lead edits, and only mechanically — typos,
+dead code, misleading names, obvious duplication. Anything touching logic, control flow, data,
+security, concurrency, contracts, or test assertions goes back to the implementer, because an
+agent that fixes a logic defect becomes its author and no independent judge remains. Parallel
+lenses propose fixes and never apply them; four agents editing one tree corrupts it.
 
 Every verification agent ends with a sign-off naming its verdict, what it ran, what it verified,
 and **what it could not verify and why**. That last line is what makes the sign-off honest. Each
