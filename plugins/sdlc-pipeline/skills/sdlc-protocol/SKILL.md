@@ -30,6 +30,9 @@ Every feature gets one directory: `.sdlc/features/<slug>/`
     prd.md
     stories/STORY-001.md  # one file per story
     backlog.md            # ordered story list with priorities
+    specification.md      # the consolidated, shareable final document
+    changes.md            # every revision: quoted before -> after, and the finding that drove it
+    recommendations.md    # what still needs improving, and what is needed to resolve each
     review/               # parallel product-review lenses, one file each
       product-critique.md   # uncovered scenarios, falsifiable criteria, story quality
       business-case.md      # problem evidence, value, metrics, cost, alternatives

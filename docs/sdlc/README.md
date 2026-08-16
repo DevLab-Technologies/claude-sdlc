@@ -74,10 +74,23 @@ counter-metric, and what the do-nothing option costs; the **UX auditor** asks wh
 experience can work at all; the **architect** gives a cost signal only, and its highest-value finding
 is a requirement that would be far cheaper stated slightly differently.
 
-The product owner then revises against all four. Deciding something is out of scope counts as
-covering it — leaving it undecided does not. Where the business case does not hold, that is
-surfaced rather than papered over, since building something whose value nobody can evidence is the
-outcome this command exists to prevent.
+The product owner then revises against all four and produces three deliverables, because a review
+whose changes nobody can see has not delivered anything:
+
+- **`specification.md`** — the consolidated final document, self-contained for someone who has read
+  none of the review files. This is the thing you share.
+- **`changes.md`** — every revision with the before and after as **quoted text**, not a description
+  of a change, each citing the finding that drove it. "Clarified AC-2" is worthless; showing
+  `"handles errors gracefully"` become `"returns 422 with code password_too_long and creates no
+  session row"` is the entire point.
+- **`recommendations.md`** — what was *not* applied because it needs a human decision or more
+  evidence, ordered by impact, each naming exactly what would resolve it.
+
+Deciding something is out of scope counts as covering it — leaving it undecided does not. No finding
+is silently dropped; a rejection is a decision that needs a reason on the record. And where the
+business case does not hold, it goes at the top of the recommendations rather than being buried,
+since building something whose value nobody can evidence is the outcome this command exists to
+prevent.
 
 ## Tests are specified before the code
 

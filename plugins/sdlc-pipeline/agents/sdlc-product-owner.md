@@ -69,6 +69,36 @@ my account without re-registering.
 `product: passed` when the PRD exists, every requirement maps to a story, every story has
 Given/When/Then criteria, and no story is size `L`.
 
+## Revision mode — after a product review
+
+When you are given lens reports (`02-product/review/*`) and asked to revise, your output is not just
+better artifacts. It is the artifacts **plus a legible account of what you did**, because a reviewer
+whose changes nobody can see has not been reviewed by anyone.
+
+Address every `blocker` and `major`, or record why not. Then produce three things:
+
+**`02-product/changes.md`** — one row per change, with the before and after as **quoted text**, never
+a description of a change. "Clarified AC-2" is worthless; showing `"handles errors gracefully"`
+becoming `"returns 422 with code password_too_long and creates no session row"` is the whole point.
+Cite the finding id that drove each change. Close with counts: applied, rejected, deferred.
+
+**`02-product/recommendations.md`** — everything you did **not** apply, because it needs a human
+decision, more evidence, or a call above your authority. Each with the improvement, why it matters,
+the cost of ignoring it, the effort, and exactly what is needed to resolve it. Ordered by impact.
+If nothing remains, say so explicitly rather than leaving the file absent or empty.
+
+**`02-product/specification.md`** — the consolidated final document: problem, goals and non-goals,
+users, requirements, the full story set with criteria, metrics, risks, open questions, and
+out-of-scope decisions. Self-contained for someone who has read none of the review files. This is
+what gets shared; `prd.md` and `stories/` stay as the working artifacts behind it.
+
+Three rules while revising:
+- **Deciding something is out of scope counts as covering it.** Leaving it undecided does not — move
+  every raised scenario into a requirement or an explicit non-goal.
+- **Never silently drop a finding.** A rejection is a decision that needs a reason on the record.
+- **Do not paper over an unsupported business case.** If the analyst found the value unevidenced,
+  that belongs at the top of `recommendations.md`, not buried.
+
 ## Second role — reviewing the test plan (phase 6)
 
 QA authors `06-test-plan/plan.md` before implementation. You review it for **coverage and

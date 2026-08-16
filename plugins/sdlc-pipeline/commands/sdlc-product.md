@@ -92,20 +92,56 @@ Launch `sdlc-product-owner` again with all four reports. It is the author, so re
   prominently and surface it to the human — proceeding to build something whose value nobody can
   evidence is the expensive outcome this command exists to prevent.
 
-Write a `## Revision log` recording what changed, what was rejected and why, and what remains open.
+## Step 4b — Produce the three deliverables
+
+The revision is not finished until these exist. A review whose output the human has to reconstruct
+by diffing files has not delivered anything.
+
+**1. `02-product/changes.md` — what actually changed.** One row per change, and the before/after
+must be **quoted text**, not a description of a change:
+
+```markdown
+| # | What | Before | After | Driven by | Severity |
+|---|---|---|---|---|---|
+| 1 | AC-2 of STORY-003 made falsifiable | "the system handles invalid credentials gracefully" | "Given invalid credentials, when submitted, then a single non-enumerating error appears within 1s and the password field clears" | PROD-4 | blocker |
+| 2 | Success metric given a baseline | "improve activation" | "activation (first project created within 24h) from 31% today to 40% by Q4" | BIZ-2 | blocker |
+| 3 | Churned-user scenario added | *(absent)* | FR-09: users returning after 90+ days see a one-time summary of what changed | PROD-1 | major |
+```
+
+End it with three counts: changes applied, findings rejected (with reasons), and items deferred to
+the human.
+
+**2. `02-product/recommendations.md` — what should still be improved.** Everything not applied,
+because it needs a human decision, more evidence, or a product call above your authority. Each with:
+what to improve, why it matters, the impact if ignored, the effort, and **what specifically is
+needed to resolve it**. Order by impact, not by the order the lenses reported them. This file is the
+answer to "what should be improved" and must never be empty without saying explicitly that nothing
+remains.
+
+**3. `02-product/specification.md` — the final document.** One consolidated, shareable
+specification: problem, goals and non-goals, users, requirements, the full story set with criteria,
+success metrics, risks, open questions, and out-of-scope decisions. Self-contained — someone who has
+read none of the review files should be able to act on it. This is the deliverable; `prd.md` and
+`stories/` remain the working artifacts behind it.
 
 ## Step 5 — Report
 
-Give the human:
+Show the human the outcome, not a description of the outcome:
 
-- Input type, entry point taken, and where the artifacts are
-- The business analyst's verdict line, verbatim
-- The count of uncovered scenarios found, and the five that matter most
-- What changed in the specification
-- **Open questions only a human can answer**, quoted and numbered so they can be answered in one
-  message
-- Findings deliberately not addressed, and why
-- Whether this is ready for `/sdlc` to pick up at the design phase, or needs another product pass
+1. **The three deliverables, by path**, with `specification.md` named as the final document.
+2. **The change table inline** — render `changes.md` in your reply, or the top 10 rows with a count
+   of the rest if it is long. They should not have to open a file to see what you changed.
+3. **The business analyst's verdict line, verbatim.**
+4. **What should still be improved** — the top items from `recommendations.md`, each in one line with
+   its impact.
+5. **Open questions only a human can answer**, quoted and numbered so they can be answered in a
+   single message.
+6. **Findings rejected**, with the reason for each.
+7. **What is ready** — whether `/sdlc <slug>` can pick this up at the design phase, or whether it
+   needs another product pass or a human answer first.
+
+Then offer, in one line, to print the full `specification.md` in the conversation — some people want
+it in front of them rather than in a file.
 
 Do not claim the specification is complete. Say what it now covers and what remains open — a PRD
 presented as finished when its central assumption is unevidenced is worse than one that names the
