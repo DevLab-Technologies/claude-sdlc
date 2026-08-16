@@ -45,6 +45,8 @@ flowchart TD
 | `sdlc-intake` | Scope, questions, assumptions | Design or estimate |
 | `sdlc-researcher` | Findings, prior art, hard constraints | Decide scope |
 | `sdlc-product-owner` | PRD, stories, acceptance criteria, priority, test-plan coverage review | Say how to build it |
+| `sdlc-product-critic` | Uncovered user scenarios, falsifiable criteria, story quality | Rewrite the spec it critiques |
+| `sdlc-business-analyst` | Problem evidence, value hypothesis, honest metrics, cost and alternatives | Manufacture confidence or doubt |
 | `sdlc-ux-designer` | Flows, screen specs, all states, copy, tokens | Change requirements silently |
 | `sdlc-ux-auditor` | Independent usability and a11y audit | Defer to the designer |
 | `sdlc-architect` | Architecture, interface contracts, ADRs, workplan, test-plan technical review | Write feature code |
@@ -58,6 +60,24 @@ flowchart TD
 | `sdlc-qa-functional` | The test plan (before code), execution, defect reports, fix verification | Pass on inspection alone |
 | `sdlc-qa-ui` | The running interface vs the spec, responsive, a11y, console | Review UI it cannot run |
 | `sdlc-release-gate` | The ship / cycle / escalate decision, traceability | Pass a gate to end a loop |
+
+## Product work can run on its own
+
+`/sdlc-product` takes a raw request, an existing PRD, or a bare set of stories and produces a
+specification worth building — then stops, before design and engineering.
+
+It fans out four lenses in parallel over the spec: the **product critic** hunts the scenarios it
+forgot (the churned user, existing users at migration, two people editing at once, what deletion
+actually means) and every acceptance criterion that cannot be falsified; the **business analyst**
+asks whether the problem is evidenced rather than asserted, whether the metric has a baseline and a
+counter-metric, and what the do-nothing option costs; the **UX auditor** asks whether the described
+experience can work at all; the **architect** gives a cost signal only, and its highest-value finding
+is a requirement that would be far cheaper stated slightly differently.
+
+The product owner then revises against all four. Deciding something is out of scope counts as
+covering it — leaving it undecided does not. Where the business case does not hold, that is
+surfaced rather than papered over, since building something whose value nobody can evidence is the
+outcome this command exists to prevent.
 
 ## Tests are specified before the code
 

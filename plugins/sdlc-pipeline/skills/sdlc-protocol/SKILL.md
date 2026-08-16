@@ -30,6 +30,11 @@ Every feature gets one directory: `.sdlc/features/<slug>/`
     prd.md
     stories/STORY-001.md  # one file per story
     backlog.md            # ordered story list with priorities
+    review/               # parallel product-review lenses, one file each
+      product-critique.md   # uncovered scenarios, falsifiable criteria, story quality
+      business-case.md      # problem evidence, value, metrics, cost, alternatives
+      ux-review.md          # is this usable as specified
+      feasibility.md        # architect's cost signal — not a design
   03-design/
     ux-spec.md
     flows.md
@@ -471,6 +476,7 @@ There is no locking here, and adding some would be worse than the constraint.
 | Phase | Parallel work | Why it is safe |
 |---|---|---|
 | 1 research | internal-code, external prior-art, and constraints sweeps | read-only, separate output files |
+| 2 product review | product critique, business case, UX review, feasibility | read-only, one report each |
 | 6 test plan review | architect and product owner | independent lenses, separate sections |
 | 7 implementation | tasks the workplan declares `parallel_with` | file-level disjoint by construction |
 | 8 review | correctness, security, performance, tests, compliance | read-only, one report each, verification pre-run |
