@@ -158,14 +158,37 @@ install it, with the plugin enabled for them:
 }
 ```
 
+Adding the marketplace this way does not install the plugin for them — as of recent versions, a
+plugin from an external source still needs `claude plugin install sdlc-pipeline@claude-sdlc` once.
+Claude Code reports it as not installed and shows the command.
+
 Commit `.sdlc/project-conventions.md` alongside it and everyone runs the same commands, the same
 gates, and the same history. Administrators can put the same two keys in managed settings to cover
 every machine; for CI or container images, pre-populate the plugin cache with
 `CLAUDE_CODE_PLUGIN_SEED_DIR` so nothing is cloned at runtime.
 
-**Updates are not automatic.** Each person runs `claude plugin update sdlc-pipeline@claude-sdlc` and
-restarts. Worth telling people when a change matters — a team split across protocol versions
-produces inconsistent artifacts with no error to signal it.
+### Updates
+
+**Auto-update is off by default.** Official Anthropic marketplaces ship with it on; third-party ones
+like this do not. So unless someone turns it on, nothing changes for them until they run:
+
+```bash
+claude plugin update sdlc-pipeline@claude-sdlc
+```
+
+To turn it on per person: `/plugin` -> **Marketplaces** -> select `claude-sdlc` -> **Enable
+auto-update**. Administrators can turn it on for everyone by adding `"autoUpdate": true` to the
+marketplace entry in managed settings, so nobody has to toggle it individually.
+
+With auto-update on, Claude Code checks shortly after a session starts (a random delay of up to ten
+minutes, so the running session keeps the versions it launched with), then either notifies you to run
+`/reload-plugins` or loads the new version on the next launch. `DISABLE_AUTOUPDATER` switches it off
+again; `FORCE_AUTOUPDATE_PLUGINS=1` keeps plugin updates while disabling Claude Code's own.
+
+Either way there is a lag between a push and everyone running it. That matters here more than for
+most plugins: the agents share a protocol, and a team split across two versions produces
+inconsistent artifacts with **no error to signal it**. When a change touches the protocol or the
+phase ordering, tell people rather than relying on the update landing.
 
 ## Adapting it
 
