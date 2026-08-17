@@ -13,7 +13,7 @@ lead, launch the lenses concurrently, and report the merged verdict.
 ## Step 0 — Establish the target and the context
 
 1. Invoke the `sdlc-protocol` skill. Section 9 governs the parallel group you are about to launch,
-   and it is the reason this runs in three steps rather than one.
+   and section 9a is why the slow verification runs alongside the lenses rather than ahead of them.
 
 2. **Resolve the target** from the argument:
    - A feature slug matching `.sdlc/features/<slug>/` -> full context mode, reviewing that
@@ -33,27 +33,36 @@ lead, launch the lenses concurrently, and report the merged verdict.
      say plainly that they could not verify against a specification. A standalone review that
      implies it checked requirements is a false signal.
 
-## Step 1 — Verify once
+## Step 1 — Verify-fast (the only blocking step)
 
-Launch `sdlc-review-lead` in **verify mode** with the target. It runs build, lint, type check, and
-the suite using the project's real commands, smoke-tests the primary path, checks any implementer
-claims, and writes `verification.md`.
+Launch `sdlc-review-lead` in **verify-fast** mode with the target: build, type check, and the diff
+scope. Seconds, not minutes.
 
-**If it reports `build_usable: no`, stop here.** Report the failure with its actual output. Five
-lenses reading code that does not compile produce five reports about one broken build.
+**If it reports `build_usable: no`, stop here.** Report the failure with its actual output. Lenses
+reading code that does not compile produce reports about one broken build.
 
-## Step 2 — Fan out five lenses, in one message
+## Step 2 — Fan out, in one message
 
-Launch all five **in a single message** so they run concurrently. Separate messages run in
-sequence and you lose the entire point.
+Launch **verify-slow and the four static lenses together** in a single message. The suite and smoke
+test take minutes and only the tests lens needs their output, so keeping them off the static lenses'
+critical path costs nothing and saves the wait (protocol 9a).
+
+- `sdlc-review-lead` **verify-slow** — suite, smoke test, claim check
+- the four static lenses below
+
+Then launch `sdlc-review-tests` once verify-slow lands, since it compares results against the plan.
+
+Hand every lens the diff scope from verify-fast, and tell the static ones to read **source**, never
+build output, which the suite may be rewriting. Launch the group in one message — separate messages
+run in sequence and you lose the entire point.
 
 | Agent | Lens | Owns file | Local id prefix |
 |---|---|---|---|
 | `sdlc-code-reviewer` | correctness + requirement fidelity | `correctness.md` | `CORR-` |
 | `sdlc-review-security` | authorization, injection, secrets, exposure | `security.md` | `SEC-` |
 | `sdlc-review-performance` | N+1, unboundedness, indexes, timeouts | `performance.md` | `PERF-` |
-| `sdlc-review-tests` | do the tests assert what was required | `tests.md` | `TEST-` |
 | `sdlc-architect` | architectural compliance | `compliance.md` | `ARCH-` |
+| `sdlc-review-tests` | do the tests assert what was required (**after verify-slow**) | `tests.md` | `TEST-` |
 
 Give every lens: the target and diff scope, the output directory, its own file name, its local id
 prefix, the path to `verification.md`, and the mode from step 0. Remind each that it must not run
@@ -95,6 +104,6 @@ specified, not that the feature is ready. That needs QA execution and belongs to
 
 ## When to reach for something lighter
 
-This launches seven agent runs. For a quick pass over a small diff, the built-in `/code-review` is
+This launches eight agent runs. For a quick pass over a small diff, the built-in `/code-review` is
 one agent and enough. Use this command when the change is substantial, touches security or
 performance-sensitive paths, or is finishing a feature cycle.

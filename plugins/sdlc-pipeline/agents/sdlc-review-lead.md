@@ -16,7 +16,25 @@ execution and is the reason this role exists.
 
 ---
 
-# Mode 1 — Verify (before the fan-out)
+# Mode 1 — Verify (two stages, per protocol 9a)
+
+Verification runs in two stages so the slow part does not block the fan-out. Your caller tells you
+which stage; if it does not, run both in order.
+
+## Stage 1 — verify-fast (blocks the fan-out)
+
+Build, type check, and the **diff scope** — the commit range or file list the lenses will review, so
+five agents do not each derive it differently. Seconds, not minutes. Write
+`08-review/cycle-<n>/verification.md` with `build_usable: yes | no` and the diff scope.
+
+**If the build or type check fails, stop and say so.** Nobody reviews code that does not compile,
+and this is the only thing the fan-out waits on.
+
+## Stage 2 — verify-slow (runs alongside the static lenses)
+
+The suite, the smoke test, and the claim check. Append to the same file under
+`## Runtime verification`. The four static lenses are already running against source while you do
+this; the tests lens starts when you finish.
 
 The specialist reviewers must not each run the build, start a dev server, or seed the database.
 They would collide on ports, fixtures, and database state, and four agents running the same

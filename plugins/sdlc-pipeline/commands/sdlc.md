@@ -58,7 +58,7 @@ trust the artifacts, not the agent's summary — and only then proceed.
 | 5 | `sdlc-architect` | architecture |
 | 6 | `sdlc-qa-functional` (plan mode) -> `sdlc-architect` + `sdlc-product-owner` review -> QA revises and approves | test-plan |
 | 7 | `sdlc-implementer` — one instance per workplan task, writing its assigned `TC` cases | implementation |
-| 8 | `sdlc-review-lead` (verify) -> **five lenses in parallel** -> `sdlc-review-lead` (synthesize) | review |
+| 8 | `sdlc-review-lead` verify-fast -> **verify-slow + 4 static lenses concurrently** -> tests lens -> lead synthesize | review |
 | 9 | `sdlc-qa-functional` (execute mode) | qa |
 | 10 | `sdlc-qa-ui` (skip if no UI) | ui-qa |
 | 11 | `sdlc-release-gate` | release |
@@ -83,28 +83,34 @@ Rules for the sequence:
   - Phase 6: the architect and product owner review the plan concurrently.
   - Phase 7: implementers for tasks the workplan declares `parallel_with`; run conflicting tasks
     in sequence.
-  - Phase 8: the five review lenses.
+  - Phase 8: verify-slow together with the four static lenses (see below).
   - Triage: one debugger per distinct symptom cluster.
   - Fix mode: implementers grouped so no two touch the same file.
+- **The architect may start the data model and backend interfaces while the UX audit runs** — audit
+  findings land on the interface, not the schema. It incorporates them before declaring
+  `interfaces.md` final, and records that the audit was still open when the schema was drafted.
+- **Tell the architect to maximize the `parallel_with` sets.** A dependency created by how the work
+  was decomposed is not a real dependency, and it costs a serial step per task.
 - **Keep functional QA and UI QA sequential.** They share one running app and one dataset, and
   functional QA mutates data that UI QA then observes. Only run them concurrently if each gets a
   genuinely isolated environment, and record that you did.
-- **Phase 8 is a fan-out in three steps**, and the order is what makes it safe. `/sdlc-review`
-  runs exactly this sequence standalone if you need to re-run review alone:
-  1. `sdlc-review-lead` in **verify mode** — runs build, lint, type check, suite, and a smoke
-     test **once**, checks the implementer's claims, and writes `verification.md`. If the build
-     is unusable it stops here; five reviewers reading broken code produce five reports about the
-     same thing.
-  2. **All five lenses in one message**, so they genuinely run concurrently:
-     `sdlc-code-reviewer` (correctness + requirement fidelity), `sdlc-review-security`,
-     `sdlc-review-performance`, `sdlc-review-tests`, and `sdlc-architect` (compliance). Tell each
-     one its lens, the file it owns, and its local id prefix. None of them runs a server, runs the
-     suite, edits code, or allocates issue ids — that is what the bracketing lead is for.
-  3. `sdlc-review-lead` in **synthesize mode** — merges and deduplicates across lenses, resolves
-     severity conflicts upward, allocates the global `ISSUE` ids, applies mechanical fixes
-     sequentially, finds the cross-cutting patterns no single lens could see, and signs off.
-- Wait for **all five** before synthesizing. A missing lens must be recorded as `not run`, never
-  silently treated as clean.
+- **Phase 8 is a pipelined fan-out** (protocol 9a). The split is what makes it fast without changing
+  what anyone examines. `/sdlc-review` runs the same sequence standalone:
+  1. `sdlc-review-lead` **verify-fast** — build, type check, diff scope. Seconds. If the build fails,
+     stop here; nobody reviews code that does not compile. This is the *only* thing the fan-out waits
+     on.
+  2. **In one message, all at once**: `sdlc-review-lead` **verify-slow** (suite, smoke, claim check)
+     plus the four static lenses — `sdlc-code-reviewer`, `sdlc-review-security`,
+     `sdlc-review-performance`, and `sdlc-architect` (compliance). The static lenses read source and
+     need no runtime facts, so the slow suite is off their critical path. Hand each one the diff scope
+     from verify-fast; tell each its lens, its file, and its local id prefix.
+  3. `sdlc-review-tests` when verify-slow lands — it compares results against the plan, so it is the
+     one lens that genuinely needs the suite.
+  4. `sdlc-review-lead` **synthesize** — merge, dedupe, resolve severity upward, allocate global
+     `ISSUE` ids, apply mechanical fixes sequentially, report cross-cutting patterns, sign off.
+- Static lenses must read **source**, never build output, since the suite may be rewriting it.
+- Wait for every launched lens before synthesizing. A missing lens is recorded `not run`, never
+  treated as clean.
 - **Phase 8 has an inner fix loop.** A review failure does not immediately cost a cycle. Triage
   the findings, run `sdlc-implementer` in fix mode, then re-run the **same** reviewer to verify
   its own findings are closed — it may re-verify what it found, since it did not fix it. Loop at

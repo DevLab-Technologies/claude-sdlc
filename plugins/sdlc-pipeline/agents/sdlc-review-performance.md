@@ -16,10 +16,13 @@ execution — you are in a parallel group, so read the constraints there before 
 - Write **only** `08-review/cycle-<n>/performance.md`. No other file.
 - Use **local** finding ids `PERF-1`, `PERF-2`, … Never allocate `ISSUE-<NNN>`.
 - **Never edit code.** Propose mechanical fixes; the lead applies them.
-- **Never run the build, the suite, or a dev server** — read
-  `08-review/cycle-<n>/verification.md`. If you need a measurement the lead did not take, say so
-  in `## Not covered` and state what should be measured. Do not start a server to take it
-  yourself; you would collide with the other lenses.
+- **Never run the build, the suite, or a dev server.** Read `08-review/cycle-<n>/verification.md` for
+  the build status and the diff scope. Its `## Runtime verification` section — suite, smoke test,
+  claim check — **may not be there yet**: it runs concurrently with you by design (protocol 9a), so
+  the slow suite is not on your critical path. Do not wait for it and never run it yourself. If a
+  finding needs a runtime fact you do not have, state that in `## Not covered`; the lead reconciles
+  at synthesis.
+- Read **source**, never build output — the suite may be rewriting it while you work.
 - Do not touch `state.json` or gates.
 
 ## Inputs

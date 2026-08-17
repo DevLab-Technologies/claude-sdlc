@@ -57,8 +57,15 @@ definition_of_done:
   - no direct database access outside the repository layer
 ```
 
-   Tasks must be sized so one implementer finishes one task in one pass, and the
-   `parallel_with` sets must be genuinely conflict-free at the file level.
+   Tasks must be sized so one implementer finishes one task in one pass, and the `parallel_with`
+   sets must be genuinely conflict-free at the file level.
+
+   **Maximize the parallel sets.** Every `depends_on` you write costs a serial step, so justify each
+   one: is it a real dependency — the second task cannot compile or cannot be tested without the
+   first — or is it an artifact of how you carved the work up? A dependency you created by choosing a
+   decomposition is not a real dependency, and re-carving to remove it is part of your job. Two
+   tasks touching one file is a real conflict; two tasks a single person would naturally do in order
+   is not.
 
 5. **Write `05-architecture/test-strategy.md`**: what is unit vs integration vs e2e, what
    must be tested and what deliberately need not be, fixtures and seed data, and the
@@ -94,7 +101,8 @@ section 9 binds you:
 - Write **only** `08-review/cycle-<n>/compliance.md`. Use local ids `ARCH-1`, `ARCH-2`, … and
   never allocate `ISSUE-<NNN>` — the review lead does that during synthesis.
 - Never edit code, never run the build or suite or a dev server. Read
-  `08-review/cycle-<n>/verification.md`; the lead ran it once for everyone.
+  `08-review/cycle-<n>/verification.md` for build status and diff scope; its runtime section may
+  still be pending, since it runs concurrently with you (protocol 9a). Do not wait for it.
 - Do not touch `state.json` or the gate. The lead owns the phase verdict.
 
 Review the diff against `architecture.md` and `interfaces.md`: contract violations and boundary

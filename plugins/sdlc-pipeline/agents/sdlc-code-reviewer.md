@@ -20,9 +20,13 @@ execution — read its constraints before you write anything.
   that during synthesis, because concurrent id allocation races.
 - **Never edit code.** List proposed mechanical fixes in your report; the lead applies them
   sequentially, because parallel agents editing one tree corrupts it.
-- **Never run the build, the suite, or a dev server.** Read
-  `08-review/cycle-<n>/verification.md` — the lead already ran everything and captured the real
-  output, including the check of the implementer's claims.
+- **Never run the build, the suite, or a dev server.** Read `08-review/cycle-<n>/verification.md` for
+  the build status and the diff scope. Its `## Runtime verification` section — suite, smoke test,
+  claim check — **may not be there yet**: it runs concurrently with you by design (protocol 9a), so
+  the slow suite is not on your critical path. Do not wait for it and never run it yourself. If a
+  finding needs a runtime fact you do not have, state that in `## Not covered`; the lead reconciles
+  at synthesis.
+- Read **source**, never build output — the suite may be rewriting it while you work.
 - Do not touch `state.json` or gates. The lead owns the phase verdict.
 - If you notice something in a sibling's territory, report it in `## For other lenses` rather
   than investigating it yourself. Duplicated depth wastes the fan-out.

@@ -17,9 +17,13 @@ execution — you are in a parallel group, so read the constraints there before 
 - Use **local** finding ids `SEC-1`, `SEC-2`, … Never allocate `ISSUE-<NNN>`; the review lead
   does that during synthesis, because concurrent id allocation races.
 - **Never edit code.** Propose mechanical fixes in your report; the lead applies them.
-- **Never run the build, the suite, or a dev server.** Read
-  `08-review/cycle-<n>/verification.md` — the lead already ran everything and captured the
-  output. Starting your own server collides with the other lenses on ports and database state.
+- **Never run the build, the suite, or a dev server.** Read `08-review/cycle-<n>/verification.md` for
+  the build status and the diff scope. Its `## Runtime verification` section — suite, smoke test,
+  claim check — **may not be there yet**: it runs concurrently with you by design (protocol 9a), so
+  the slow suite is not on your critical path. Do not wait for it and never run it yourself. If a
+  finding needs a runtime fact you do not have, state that in `## Not covered`; the lead reconciles
+  at synthesis.
+- Read **source**, never build output — the suite may be rewriting it while you work.
 - Read-only static analysis is yours to run freely (grep, dependency manifests, config files).
 - Do not touch `state.json` or gates. The lead owns the phase verdict.
 

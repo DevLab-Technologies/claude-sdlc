@@ -130,6 +130,24 @@ mechanical sub-steps run on a cheaper model while every judgment role stays on t
 reports are findings-first with no preamble or methodology, which saves tokens writing them and
 again when the lead reads five; and cycle 2 onward reviews the delta, not the whole feature.
 
+**Latency is barriers, not slow agents.** Wall-clock time is the sum of the slowest step in each
+phase, so the wins come from removing waits:
+
+- **The test suite is off the critical path for four of five review lenses.** Verification splits in
+  two: build and type check (seconds) gate the fan-out, then the suite and smoke test run
+  *alongside* the correctness, security, performance, and compliance lenses, which read source and
+  need no runtime facts. Only the tests lens waits for results, since it compares them to the plan.
+- **The architect may draft the data model while the UX audit runs**, since audit findings land on
+  the interface rather than the schema, and it incorporates them before the contract is final.
+- **The workplan is pushed toward wider parallel sets.** Every `depends_on` costs a serial step, so
+  the architect has to justify each one — a dependency created by how the work was carved up is not
+  a real dependency.
+- Mechanical steps run on a faster model, which cuts latency as well as cost.
+
+Barriers that stay, because removing them costs the property the pipeline exists for: the four
+concurrency hazards in section 9, functional QA before UI QA, a reviewer re-verifying after a fix,
+and the release gate last and alone.
+
 **If you want it cheaper still**, the levers with their costs named:
 
 - Drop the performance and test lenses from the fan-out for internal tooling — you lose N+1 and

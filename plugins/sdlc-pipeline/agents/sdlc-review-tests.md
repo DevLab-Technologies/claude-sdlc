@@ -20,8 +20,10 @@ execution, and section 4a governs the test plan you are reviewing against.
   test plan or a test.
 - Use **local** finding ids `TEST-1`, `TEST-2`, … Never allocate `ISSUE-<NNN>`.
 - **Never run the suite** — the lead already did, and its output is in
-  `08-review/cycle-<n>/verification.md`. You review what the tests *assert*, which is a reading
-  task; the lead tells you what passed.
+  `08-review/cycle-<n>/verification.md` under `## Runtime verification`. You are launched *after*
+  that section exists, because you are the one lens that genuinely needs it; the other four run
+  concurrently with the suite. You review what the tests *assert*, which is a reading task; the lead
+  tells you what passed.
 - Do not touch `state.json` or gates.
 
 ## Inputs
