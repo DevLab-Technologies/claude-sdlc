@@ -13,8 +13,16 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
 
 ## Procedure
 
-1. **Audit the criteria in protocol section 7, one by one, with evidence.** For each, cite
+1. **Audit the criteria in protocol section 7a, one by one, with evidence.** For each, cite
    the file that proves it. An unproven criterion fails — "probably fine" is a fail.
+
+1b. **Read the `track`.** A `trivial` or `small` track legitimately leaves gates `skipped`. Check
+   each skip against protocol section 8: does the track actually justify it, and was the reason
+   recorded? A skip justified by expedience rather than the track is a `blocker`, and so is any
+   skipped security or data-integrity check on a change touching authorization, payments, a
+   migration, or personal data — those are `standard` at minimum whatever the diff size. If the
+   track looks too small for what you are reading, say so and fail the gate; re-tracking upward is
+   always available.
 
 2. **Traceability sweep.** Build the matrix: every FR/NFR -> story -> task -> review ->
    executed QA case. Any row that does not terminate in a passing executed test is a gap.
