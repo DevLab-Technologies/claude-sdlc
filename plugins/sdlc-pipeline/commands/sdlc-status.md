@@ -21,6 +21,19 @@ For each feature, read `state.json`, `history/events.jsonl`, `issues/*.md`,
 - **Waiting on** — unanswered blocking bus messages and unanswered human questions, quoted
 - **Recent activity** — the last five events from the log, one line each
 - **Next action** — the exact agent to run next, and why
+- **Interrupted runs** — any unpaired `phase_start`, or artifact lacking `status: complete`. Say plainly
+  that `/sdlc-resume` is needed rather than reporting the position as if the run finished
+
+If this is a cross-repo program (`spec-link.md` or `participants.json` present), also report:
+
+- **Participants** — role, track, and gate roll-up per repo, and which ones you could not read
+- **Contracts** — per boundary: version, status, and who has acknowledged what
+- **Drift** — this is the point of checking. Compare the commit in `spec-link.md` against the shared
+  workspace's current head and say explicitly when a repo is building against a superseded contract, when
+  a compatibility window has expired, and when an acknowledgement is missing entirely. A repo silently on
+  an old contract is the failure this reporting exists to catch
+- **Integration** — whether every participant is done, and whether the gate has run against the current
+  participant commits or an older set
 
 Then a portfolio summary: how many features are in progress, awaiting a human, blocked, or
 ready to ship — and the single thing most worth attention right now.

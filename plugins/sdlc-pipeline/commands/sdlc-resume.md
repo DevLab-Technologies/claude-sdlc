@@ -27,6 +27,30 @@ Read `state.json`, then `history/events.jsonl`, then the artifacts. Build the pi
 5. **Check for a half-finished parallel group.** In a fan-out, some members may have completed and
    some not. Only the unpaired ones need re-running; completed reports stand.
 
+## Step 1b — If this is a program, diagnose both levels
+
+A cross-repo program has two kinds of state, and an interruption can leave them disagreeing. If
+`spec-link.md` or `participants.json` exists, this is a program (protocol 12) — widen the diagnosis:
+
+1. **Which workspace was interrupted?** Check the shared workspace *and* this repo. An interruption in
+   the shared phases is different from one in a participant's local cycle, and the fix differs.
+2. **Shared-versus-local drift.** Compare `participants/<repo>/status.md` in the shared workspace against
+   that repo's own `state.json`. The **repo's own state is authoritative for that repo** — a stale
+   `status.md` is a reporting lag, not a reason to re-run the repo's work. Refresh the copy instead.
+3. **Contract state.** A steward interrupted mid-publication is the dangerous case: a contract may be
+   `published` in the file while its `CHANGELOG.md` has no entry, or vice versa. Never resolve this by
+   guessing — a consumer may already have built against it. Report both states and let the human decide,
+   because silently un-publishing a contract someone consumed is worse than any delay.
+4. **Acknowledgement skew.** A `contract-ack.md` written locally but not copied to the shared workspace,
+   or the reverse. Reconcile toward whatever the consumer actually built against, which is the local
+   copy.
+5. **Interrupted integration.** If `12-integration/cycle-<n>/` has partial output, quarantine it and
+   re-run the whole gate rather than the missing pieces. Integration passes for a *set of participant
+   commits*, so a half-finished gate cannot be topped up — the commits may have moved since.
+
+**Do not re-run another repository's work from here.** You can only see this checkout and the shared
+workspace. Report which participants need their own `/sdlc-resume` and let the human run them there.
+
 ## Step 2 — Report the diagnosis and get agreement
 
 Before changing anything, tell the human:
@@ -39,6 +63,8 @@ Before changing anything, tell the human:
 
 **Stop and ask if any of these hold**, because each can destroy work or produce a wrong verdict:
 - Unaccounted code edits in the working tree — the human may want to keep, review, or revert them
+- A contract left half-published, since a consumer may already depend on it
+- An interrupted integration gate whose participant commits have since moved
 - A gate marked `passed` with a missing artifact, which may mean someone edited state by hand
 - More than one interrupted cycle, meaning the history is harder to trust than a fresh cycle would be
 

@@ -59,6 +59,8 @@ flowchart TD
 | `sdlc-review-tests` | Whether each test asserts what the plan required | Rewrite a test it judges |
 | `sdlc-qa-functional` | The test plan (before code), execution, defect reports, fix verification | Pass on inspection alone |
 | `sdlc-qa-ui` | The running interface vs the spec, responsive, a11y, console | Review UI it cannot run |
+| `sdlc-contract-steward` | Boundary contracts, versioning, publication, breaking-change policy, drift | Implement, or decide product scope |
+| `sdlc-integration-qa` | Conformance both directions, cross-repo journeys, version alignment, deploy order | Run before every participant passed its own gates |
 | `sdlc-release-gate` | The ship / cycle / escalate decision, traceability | Pass a gate to end a loop |
 
 ## Product work can run on its own

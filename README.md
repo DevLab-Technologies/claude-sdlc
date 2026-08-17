@@ -47,6 +47,9 @@ independent ever checks. This pipeline is mostly a set of constraints against th
 | `/sdlc-status [slug]` | Position, gates, issues, investigations, and the next action |
 | `/sdlc-resume [slug]` | Diagnose an interrupted run, quarantine partial output, re-run only what died |
 | `/sdlc-init` | Set up a project and learn its build, lint, and test commands |
+| `/sdlc-program <request>` | A feature spanning several repos — spec written once, versioned contracts published so consumers start immediately |
+| `/sdlc-join <spec> [slug]` | Run in a participating repo: take its slice, implement against the published contract, run its own gates |
+| `/sdlc-integrate [slug]` | The integration gate — conformance both ways, cross-repo journeys, deploy order |
 
 Plugin commands are namespaced, so they appear as `/sdlc-pipeline:sdlc`, and so on.
 
@@ -113,6 +116,37 @@ one agent edits per phase, the build and suite run **once** before the fan-out i
 group reads, and only the phase owner touches `state.json`.
 
 [docs/sdlc/README.md](docs/sdlc/README.md) has the flow diagram and the full role table.
+
+## Features that span repositories
+
+Backend, admin, frontend, and mobile are four repos and one feature. Running the pipeline separately in
+each produces four PRDs that drift and no shared contract, so programs work differently: **the
+specification is written once, and each repo implements its own slice against a published contract.**
+
+The shared workspace — a specs repository by default — holds intake through the test plan, plus
+`participants.json` and the versioned contracts. Each participating repo keeps its own
+implementation, review, and QA cycles, its own track, and its own gates, linked back by a
+`spec-link.md` recording the commit it read.
+
+**Publishing a contract is the schedule-critical act.** A published, versioned boundary contract is
+precise enough to build a mock from, so consumers start as soon as it exists rather than when the
+provider finishes. That serialization is the largest cost in multi-repo work and this is what removes it.
+Consumers implement against `published` versions only — never a draft, whose words may still be taken
+back — and a breaking change needs a version bump, a compatibility window, a per-consumer migration
+note, and an acknowledgement from every consumer.
+
+**Awareness is pull, not push.** No agent can notify another repository, so a repo learns what changed by
+reading the shared workspace. `spec-link.md` records the commit last read, and `/sdlc-status` compares it
+against the current head to say plainly "contract v2 published, this repo targets v1". A repo silently
+building on a superseded contract is the failure this reporting exists to catch.
+
+**The integration gate** verifies what no single repo can: that the provider honors its contract, and —
+the direction teams skip — that consumers assume **only** what the contract promises rather than an
+undocumented behavior they observed. Plus cross-repo journeys, deliberately induced version skew, and a
+deploy order that follows expand-contract. An order requiring two repos to deploy simultaneously is
+reported as a finding, not an instruction: there is no cross-repo atomicity.
+
+Design rationale in [ADR-0002](docs/adr/0002-shared-spec-workspace-for-multi-repo-features.md).
 
 ## Cost and speed
 

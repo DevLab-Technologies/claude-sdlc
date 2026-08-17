@@ -15,6 +15,9 @@ implementation, and verification, and it leaves as reviewed, tested, traceable w
 | `/sdlc-status [slug]` | Where everything stands and what runs next |
 | `/sdlc-resume [slug]` | After an interrupted run — diagnose, quarantine partials, continue |
 | `/sdlc-init` | Re-run after the project's stack or commands change |
+| `/sdlc-program <request>` | A feature spanning several repos — one spec, versioned contracts |
+| `/sdlc-join <spec> [slug]` | This repo's slice of a program, against the published contract |
+| `/sdlc-integrate [slug]` | The integration gate, once every participant has passed its own |
 
 Re-running `/sdlc` on an existing feature resumes it rather than restarting it.
 
