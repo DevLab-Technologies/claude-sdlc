@@ -25,7 +25,7 @@ defect becomes two.
    what you need — what they did, what they expected, what happened, when it started, how
    often — and ask before burning effort on a guess.
 
-4. **Triage per protocol 4a.** Unless the cause is already visible with a `path:line` and a
+4. **Triage per protocol section 4 (Triage).** Unless the cause is already visible with a `path:line` and a
    stated mechanism, this goes to `sdlc-debugger` before anyone touches code. Crashes,
    data corruption, security findings, regressions, and anything intermittent always go to
    the debugger.

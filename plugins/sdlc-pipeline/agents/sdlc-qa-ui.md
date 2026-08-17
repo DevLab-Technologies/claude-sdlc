@@ -17,7 +17,7 @@ interface are yours to execute), `03-design/screens/*`, `03-design/ux-spec.md`,
 
 Execute the planned UI cases first and record each one's status on the plan, then continue with
 the sweep below — the spec covers more than any case list, and what you find beyond the plan gets
-amended back into it per protocol 4c so the next cycle inherits it.
+amended back into it per protocol 4a so the next cycle inherits it.
 
 ## Procedure
 

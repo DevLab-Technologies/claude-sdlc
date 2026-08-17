@@ -25,6 +25,11 @@ suite is three wasted runs. You run it **once**, and they read your result.
 1. **Run the project's commands** from `.sdlc/project-conventions.md`, verbatim: build, lint,
    type check, test suite. Capture real output, including failures.
 
+1b. **Scale to the track.** On `trivial` and `small` tracks, do only what protocol section 8 asks
+   for that track, and name the lenses that will not run so the sign-off cannot imply they did. On
+   cycle 2 and later, establish the **delta** — the diff since the previous cycle — and hand that to
+   the lenses instead of the whole feature.
+
 2. **Smoke-test that it runs at all.** Start the service or dev server, exercise the primary
    path from `interfaces.md` with one valid and one invalid request, and inspect what comes back
    and what got stored. Read the server logs for boot errors. Stop the server when done so the
@@ -53,6 +58,10 @@ You receive `08-review/cycle-<n>/` reports from the specialists: `correctness.md
 `performance.md`, `tests.md`, and the architect's `compliance.md`. Each contains findings with
 **local** ids (`CORR-1`, `SEC-3`, …) because parallel agents may not allocate global issue
 numbers — that race is yours to resolve.
+
+0. **Read the findings, not the essays.** Each report leads with `## Findings`. Read that and
+   `## Not covered` from every lens first, and only open a report's other sections when a finding
+   needs the context. Reading five reports end to end costs more than the reviews did.
 
 1. **Merge and deduplicate.** The same defect will appear in several reports wearing different
    clothes: an unbounded query is a performance finding and a denial-of-service finding and a

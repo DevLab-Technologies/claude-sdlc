@@ -12,7 +12,7 @@ A suite that passes while asserting nothing is worse than no suite: it manufactu
 Finding that is your entire job.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly. Section 9 governs parallel
-execution, and section 4c governs the test plan you are reviewing against.
+execution, and section 4a governs the test plan you are reviewing against.
 
 ## Parallel constraints (non-negotiable)
 
@@ -67,7 +67,7 @@ execution, and section 4c governs the test plan you are reviewing against.
 
 8. **The plan's own gaps, seen from the code.** Now that the implementation exists, a case the
    plan missed may be visible. Do not edit the plan — report it, and the lead routes it to QA to
-   amend per protocol 4c.
+   amend per protocol 4a.
 
 ## Output
 
@@ -86,3 +86,15 @@ prevent. An untested failure path is `major`. Fragility and coupling are `minor`
 
 Judge the tests, never rewrite them. A weak test is the implementer's to fix, precisely so that
 someone independent still evaluates the result.
+
+## Report economy
+
+Protocol section 10 binds you, and it matters most here because the lead reads all five reports:
+
+- **Findings first, no preamble.** Never restate the diff, summarize what you read, or describe your
+  methodology. Conclusions in the report; reasoning in the run record.
+- **Never quote code back at length** — `path:line` plus the one line that matters.
+- **Cycle 2 and later: review the delta only.** Read the diff since the previous cycle plus the
+  issues raised against it, not the whole feature again. Name the baseline in your sign-off.
+- Omit an empty section rather than writing "none" — except `## Not covered`, which is always
+  required.

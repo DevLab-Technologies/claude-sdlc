@@ -20,10 +20,32 @@ enforce the gates, and keep the workspace honest.
    verbatim to `brief.md`, initialize `state.json` (`cycle: 1`, all gates `pending`), and
    register the feature in `.sdlc/registry.json`.
 
+## Pick the track before running anything
+
+Read protocol section 8 and choose `trivial` | `small` | `standard` | `large`, then record it in
+`state.json` and state it in your first reply with the reason. Running the full pipeline on a copy
+change costs time and money without buying quality; running the trivial track on an auth change is
+the mistake that matters.
+
+Judge on **what the change touches**, not how large it sounds. Then apply the two hard rules:
+security, authorization, payments, migrations, and personal data are `standard` at minimum whatever
+the diff size; and any agent that finds the track too small says so and you re-track **upward**
+immediately, recording the escalation. Never silently downgrade.
+
+For `trivial` and `small`, skip phases per protocol section 8 and mark each skipped gate `skipped`
+with the reason — an unexplained skip is indistinguishable later from an oversight.
+
 ## Phase sequence
 
-Run each phase by launching its agent with: the slug, the phase, the cycle number, and the
-absolute paths of its input artifacts. After each agent returns, read the gate it wrote —
+Run each phase by launching its agent with: the slug, the phase, the cycle number, the track, and
+the absolute paths of its input artifacts. Pass **only the paths that agent needs** — an agent handed
+the whole workspace reads the whole workspace, which is the most common way a run gets expensive.
+
+Override the model to `sonnet` for the mechanical sub-steps, where the work is running commands and
+recording results rather than judging: the review lead's **verify** mode, and `sdlc-qa-ui` when it is
+only re-checking previously failed screens. Leave every judgment role on the default — the review
+lenses, the debugger, the architect, and the critics earn their cost by finding what a cheaper model
+misses. After each agent returns, read the gate it wrote —
 trust the artifacts, not the agent's summary — and only then proceed.
 
 | # | Agent | Gate |
@@ -87,7 +109,7 @@ Rules for the sequence:
   the findings, run `sdlc-implementer` in fix mode, then re-run the **same** reviewer to verify
   its own findings are closed — it may re-verify what it found, since it did not fix it. Loop at
   most twice. If blockers survive two fix attempts, stop looping and let the cycle close; two
-  failed fixes mean the cause was never found, and protocol 4a sends it to `sdlc-debugger`.
+  failed fixes mean the cause was never found, and protocol section 4 (Triage) sends it to `sdlc-debugger`.
 - Never accept a reviewer's `passed` after an implementer changed code the reviewer has not
   re-read. Re-run the reviewer, or the sign-off refers to code that no longer exists.
 - Phases 8 and 9 both read the same build; run functional QA first, since a broken build
@@ -96,7 +118,7 @@ Rules for the sequence:
 ## The defect loop
 
 When review, QA, or UI QA fails, do not go straight to fixing. Triage every open issue
-using protocol section 4a:
+using protocol section 4 (Triage):
 
 1. Route each issue: obvious cause -> `sdlc-implementer`; unproven, intermittent,
    regression, crash, security, or twice-reopened -> `sdlc-debugger` first; contract

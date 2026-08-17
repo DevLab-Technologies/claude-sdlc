@@ -185,6 +185,51 @@ Always validate before pushing; a malformed manifest breaks the install for ever
 claude plugin validate ./plugins/sdlc-pipeline
 ```
 
+## Cost and speed
+
+The full pipeline is expensive by design — it is buying independent verification, and independence
+costs a second opinion. But it should only cost that when the change warrants it.
+
+**It scales to the change.** The orchestrator picks a track and records it in `state.json`:
+
+| Track | Fits | Phases | Lenses |
+|---|---|---|---|
+| `trivial` | copy, config, a constant, a dependency bump | intake, implement, review, release | correctness only |
+| `small` | one contained change, no new surface or data | + product, test-plan, qa | correctness + the one lens it touches |
+| `standard` | a normal feature | all | all five |
+| `large` | new subsystem, migration, auth/payments/data model | all, higher `max_cycles` | all five + a second security pass |
+
+Two rules stop that becoming a quality hole: escalation is free and always upward — any agent that
+finds the track too small says so and it re-tracks — and **security, authorization, payments,
+migrations, and personal data are `standard` at minimum whatever the diff size**.
+
+**Where the tokens actually went, and what changed:**
+
+- The protocol skill was 6.5k tokens and every agent loaded all of it — about 130k tokens of pure
+  duplication per full run. It is now 3.7k, holding only what is genuinely shared; role-specific
+  checklists moved into the single agent that uses them, where they load once.
+- Mechanical sub-steps run on `sonnet` — intake, research, and the review lead's verify mode, where
+  the work is running commands and recording results. Every judgment role stays on the default,
+  because a cheaper model reviewing security is a false negative waiting to happen.
+- Reports are findings-first with no preamble, no methodology, and no quoting code back at length.
+  That saves tokens twice: writing them, and again when the lead reads five of them.
+- **Cycle 2 and later review the delta**, not the whole feature again, and name the baseline in the
+  sign-off.
+- Agents are handed the specific paths they need. An agent given the workspace reads the workspace.
+
+**If you want it cheaper still**, the honest levers, with their costs named:
+
+- Drop `sdlc-review-performance` and `sdlc-review-tests` from the phase 8 fan-out for internal
+  tooling — you lose N+1 and unbounded-growth detection, and the check that tests assert what the
+  plan required.
+- Lower `max_cycles` so it escalates to you sooner instead of iterating.
+- Move a lens to `sonnet` in its agent file. Measure before trusting it: the lenses earn their cost
+  on subtle findings, which is exactly what gets lost first.
+- Use `/code-review` instead of `/sdlc-review` on small diffs — one agent instead of seven.
+
+What is not a lever: skipping the release gate, or letting one agent both fix and sign off. Those are
+the pipeline's only defenses against a green light nobody earned.
+
 ## Adapting it
 
 Every agent is a plain markdown file in [`plugins/sdlc-pipeline/agents/`](plugins/sdlc-pipeline/agents).

@@ -10,8 +10,8 @@ the pipeline. Your caller tells you which. If it does not, infer from `state.jso
 plan means **plan mode**; an approved plan plus implemented code means **execute mode**.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for
-where artifacts live, how agents communicate, and how state and history are recorded. Section
-4c governs the test plan.
+where artifacts live, how agents communicate, and how state and history are recorded. Section 4a
+carries the plan's schema and amendment rule; the authoring checklist below is yours alone.
 
 ---
 
@@ -35,11 +35,22 @@ you toward testing what is there instead of what was specified.
    one about a user journey is `e2e`. Pushing everything to `e2e` produces a slow suite that
    proves little — the architect will flag it, correctly.
 
-2. **Then find what the criteria forgot.** Walk the edge-case checklist in protocol 4c against
-   every story, and for each item either write a case or record in the plan why it does not
-   apply. This is the most valuable thing you do. The acceptance criteria describe the intended
-   path; defects live in the boundaries, the concurrent access, the interrupted flow, the
-   expired session, and the malformed input.
+2. **Then find what the criteria forgot** — the most valuable thing you do. The criteria describe
+   the intended path; defects live elsewhere. Walk this list against every story and either write a
+   case or record why it does not apply. Silence is not a decision:
+
+   boundaries (zero, one, maximum, one past maximum, empty, whitespace, very long) · absent and null
+   inputs · malformed and wrong-type inputs · duplicate submission and double-click · concurrent
+   access to one record · out-of-order and repeated events · interrupted flow (navigate away,
+   refresh, kill mid-request) · expired or revoked session · insufficient permission · network
+   failure, timeout, partial response · dependency unavailable · idempotency of retries · pagination
+   limits and empty pages · time and timezone, DST, clock skew · unicode, emoji, and right-to-left
+   text in every free-text field · numeric precision and rounding on money · sort stability and
+   tie-breaking · cache staleness after write · migration and rollback of any schema change
+
+   Every acceptance criterion needs at least one case at the lowest level that can prove it, plus an
+   `e2e` case for each P0 story's happy path. A case must be specific enough that two engineers
+   would write the same assertion from it.
 
 3. **Mine the architecture for failure modes.** `architecture.md` names the partial failures,
    timeouts, retries, and idempotency requirements — each is a case. `interfaces.md` names
@@ -52,8 +63,8 @@ you toward testing what is there instead of what was specified.
    implementer who owns that code. `e2e` cases go to whoever owns the surface, or to `qa` if you
    will automate them yourself. Manual is a last resort and needs a stated reason.
 
-6. **Write `06-test-plan/plan.md`** in the format in protocol 4c: status header, the index
-   table, and a detail block for any case whose steps do not fit one line. Add the coverage
+6. **Write `06-test-plan/plan.md`** in the schema from protocol 4a: status header, the index table,
+   and a detail block for any case whose steps do not fit one line. Add the coverage
    matrix — every AC id against the case ids covering it — and flag any AC with no case as a
    gap rather than quietly leaving it uncovered.
 
@@ -99,7 +110,7 @@ with `status: fixed`, and the previous cycle's results.
 4. **Explore beyond the plan.** Now that the system is real, probe what you could not foresee
    in phase 6 — odd interaction orders, states the implementation introduced, anything the
    handoff says the implementer was unsure about. Record these in
-   `09-qa/cycle-<n>/exploratory.md` and amend them into the plan as new cases per protocol 4c,
+   `09-qa/cycle-<n>/exploratory.md` and amend them into the plan as new cases per protocol 4a,
    so the next cycle and the next feature inherit them.
 
 5. **Verify fixed issues.** Run the verification steps in each issue body. On success set
