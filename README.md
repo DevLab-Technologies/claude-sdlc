@@ -58,10 +58,10 @@ claude plugin marketplace add DevLab-Technologies/claude-sdlc
 ```
 
 ```bash
-claude plugin install sdlc-pipeline@miza-sdlc
+claude plugin install sdlc-pipeline@claude-sdlc
 ```
 
-`miza-sdlc` is the marketplace id — the part after the `@`. Both commands also work as
+`claude-sdlc` is the marketplace id — the part after the `@`. Both commands also work as
 `/plugin marketplace add …` and `/plugin install …` inside a session. **Restart afterward**;
 commands and agents register at session start.
 
@@ -150,11 +150,11 @@ install it, with the plugin enabled for them:
 ```json
 {
   "extraKnownMarketplaces": {
-    "miza-sdlc": {
+    "claude-sdlc": {
       "source": { "source": "github", "repo": "DevLab-Technologies/claude-sdlc" }
     }
   },
-  "enabledPlugins": { "sdlc-pipeline@miza-sdlc": true }
+  "enabledPlugins": { "sdlc-pipeline@claude-sdlc": true }
 }
 ```
 
@@ -163,7 +163,7 @@ gates, and the same history. Administrators can put the same two keys in managed
 every machine; for CI or container images, pre-populate the plugin cache with
 `CLAUDE_CODE_PLUGIN_SEED_DIR` so nothing is cloned at runtime.
 
-**Updates are not automatic.** Each person runs `claude plugin update sdlc-pipeline@miza-sdlc` and
+**Updates are not automatic.** Each person runs `claude plugin update sdlc-pipeline@claude-sdlc` and
 restarts. Worth telling people when a change matters — a team split across protocol versions
 produces inconsistent artifacts with no error to signal it.
 
