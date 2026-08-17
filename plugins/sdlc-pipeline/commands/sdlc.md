@@ -13,9 +13,11 @@ enforce the gates, and keep the workspace honest.
 ## Setup
 
 1. Invoke the `sdlc-protocol` skill. Everything below assumes it.
-2. Derive a kebab-case `<slug>` from the request. If `.sdlc/features/<slug>/` already
-   exists, this is a resumption — read `state.json` and `history/events.jsonl`, report the
-   current position, and continue from there rather than starting over.
+2. Derive a kebab-case `<slug>` from the request. If `.sdlc/features/<slug>/` already exists, this is
+   a resumption — read `state.json` and `history/events.jsonl`, report the current position, and
+   continue from there rather than starting over. **If the log shows an unpaired `phase_start`, or any
+   artifact lacks `status: complete`, a previous run was interrupted: stop and run `/sdlc-resume`
+   first.** Continuing on top of partial output is how an interruption becomes a wrong verdict.
 3. Otherwise scaffold `.sdlc/features/<slug>/` per the protocol layout, write the request
    verbatim to `brief.md`, initialize `state.json` (`cycle: 1`, all gates `pending`), and
    register the feature in `.sdlc/registry.json`.
@@ -64,6 +66,9 @@ trust the artifacts, not the agent's summary — and only then proceed.
 | 11 | `sdlc-release-gate` | release |
 
 Rules for the sequence:
+- **Bracket every launch in the log.** Each agent appends `phase_start` before working and
+  `run_complete` after (protocol 3a). That pairing is the only thing that tells a later session which
+  runs finished, so never skip it for a phase you expect to be quick.
 - **Stop at a failed gate.** Never run a downstream phase on a failed upstream gate.
 - **Phase 6 is a loop, not a single call.** QA authors the plan, then the architect and product
   owner review it **in parallel** (independent lenses — launch them together), then QA revises

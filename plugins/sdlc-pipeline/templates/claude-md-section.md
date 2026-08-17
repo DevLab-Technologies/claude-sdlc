@@ -13,6 +13,7 @@ implementation, and verification, and it leaves as reviewed, tested, traceable w
 | `/sdlc-product <request or PRD>` | Specification work alone — review and improve a request, PRD, or stories |
 | `/sdlc-review [target]` | The full parallel review alone — a feature, branch, PR, path, or working diff |
 | `/sdlc-status [slug]` | Where everything stands and what runs next |
+| `/sdlc-resume [slug]` | After an interrupted run — diagnose, quarantine partials, continue |
 | `/sdlc-init` | Re-run after the project's stack or commands change |
 
 Re-running `/sdlc` on an existing feature resumes it rather than restarting it.

@@ -45,6 +45,7 @@ independent ever checks. This pipeline is mostly a set of constraints against th
 | `/sdlc-review [target]` | The whole review phase alone — a feature, branch, PR number, path, or the working diff |
 | `/sdlc-bug <report>` | The root-cause path, with every verification gate intact |
 | `/sdlc-status [slug]` | Position, gates, issues, investigations, and the next action |
+| `/sdlc-resume [slug]` | Diagnose an interrupted run, quarantine partial output, re-run only what died |
 | `/sdlc-init` | Set up a project and learn its build, lint, and test commands |
 
 Plugin commands are namespaced, so they appear as `/sdlc-pipeline:sdlc`, and so on.
@@ -90,6 +91,13 @@ Each feature gets a workspace at `.sdlc/features/<slug>/` holding the artifacts 
 an append-only `history/events.jsonl`, a full record of every agent run, issues as individual
 files, and `state.json` as the single source of truth for position and gate status. The contract
 for all of it is the `sdlc-protocol` skill, which every agent reads and treats as binding.
+
+**Interruption is expected, not exceptional.** Every agent brackets its run in the event log and
+marks its artifacts `status: partial` until a final write flips them to `complete`, and `state.json`
+is always written last. So a killed session leaves an unambiguous trace: an unpaired `phase_start`
+means that agent was interrupted and its output is untrusted. `/sdlc-resume` reconciles state against
+the log and the artifacts, quarantines the partial files rather than deleting them, and re-runs only
+the agents that actually died — a half-finished fan-out re-runs the missing lenses, not all five.
 
 A **gate** passes only when the artifact proving it exists — the orchestrator is told never to
 mark a gate from an agent's summary. A **cycle** is one pass of implement → review → QA → UI QA;

@@ -87,6 +87,44 @@ Also write `history/runs/<ISO-ts>-<agent>.md` with frontmatter (`agent`, `phase`
 about, what you deliberately did not do. A human reading only that file must be able to
 reconstruct your reasoning.
 
+## 3a. Interruption and resume
+
+A run can die at any moment — a killed session, a crash, a closed laptop, a hit context limit. The
+workspace is designed so the next session can tell exactly where it stopped and what to trust.
+
+**Three rules make it work. Follow them even when a run seems certain to finish.**
+
+1. **Bracket your run in the event log.** Append `phase_start` with your agent name, phase, and cycle
+   **before** you do any work, and `run_complete` when you are done. An unpaired `phase_start` is the
+   signature of an interrupted run.
+2. **Mark your artifacts complete, last.** Every artifact you write carries `status: partial` in its
+   frontmatter from the moment you create it, flipped to `status: complete` in your final write. A
+   file without `status: complete` is **untrusted** — it may be half a thought.
+3. **Update `state.json` as your very last action**, in one write. A gate therefore never claims
+   `passed` for work that did not finish.
+
+**Resuming.** Read `state.json` for position, then reconcile against the event log:
+
+| Signal | Meaning | Action |
+|---|---|---|
+| `phase_start` with no `run_complete` | that agent was interrupted | discard its artifacts and re-run it |
+| Artifact without `status: complete` | partial output | discard and re-run its owner |
+| Gate `pending`, artifacts present and complete | the agent finished but state was not written | verify the artifacts, then set the gate |
+| Parallel group with some members unpaired | only those members were interrupted | re-run **only** those; completed reports stand |
+| Working tree has edits not listed in a `## Fixed inline` section | the lead was interrupted mid-fix | inspect the diff, then either record or revert those edits before continuing |
+
+Discard means move it aside, not delete it: rename to `<name>.interrupted-<ts>.md` so the evidence
+survives. A partial report can still show what an interrupted agent was seeing.
+
+**Never resume by assuming.** If the log and the artifacts disagree, say so and reconcile from the
+artifacts — they are the work; state is a claim about the work. Report what you discarded and why
+rather than silently redoing it, because a re-run that quietly replaces a different conclusion is
+how an interruption becomes a wrong verdict.
+
+**Idempotence.** Re-running an interrupted agent must revise its output in place for that cycle, not
+append a second copy. Numbered artifacts already allocated — `ISSUE-011`, `INV-004`, `TC-014` — keep
+their numbers; never reuse a number for different content.
+
 ## 4. Issues
 
 `issues/ISSUE-<NNN>.md`, monotonic across the feature, numbers never reused:
