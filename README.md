@@ -1,99 +1,57 @@
 # SDLC Pipeline for Claude Code
 
-An automated software development lifecycle. A feature request enters; specialized agents
-carry it through discovery, specification, design, architecture, implementation, and
-verification; it leaves as reviewed, tested, traceable work — or it escalates to a human with
-options instead of pretending to be done.
+A software development lifecycle built out of specialized agents. A feature request enters;
+agents carry it through scoping, specification, design, architecture, a test plan written before
+the code, implementation, review, and QA; it leaves as reviewed, tested, traceable work — or it
+escalates to a human with options instead of pretending to be done.
 
-This repository is a **Claude Code plugin marketplace**. The plugin lives in
-[`plugins/sdlc-pipeline/`](plugins/sdlc-pipeline).
+It is a Claude Code plugin. The interesting part is not that it has many agents — it is the rules
+that keep them honest with each other.
 
-## What you get
+## Why it is built this way
 
-Twenty-two commands and agents, coordinating through a durable filesystem workspace:
+Most multi-agent setups fail the same way: an agent does work, declares it good, and nobody
+independent ever checks. This pipeline is mostly a set of constraints against that.
 
-- `/sdlc <request>` — the full pipeline: intake, research, PRD and stories, UX design, UX
-  audit, architecture with ADRs, a reviewed test plan written before the code, implementation,
-  review, functional QA, UI QA, release gate
-- `/sdlc-bug <report>` — the root-cause path: reproduce, prove the cause, fix the cause, add
-  a regression test, verify, sweep the blast radius
-- `/sdlc-product <request or PRD>` — product-only work: reviews a request, PRD, or story set
-  through four parallel lenses for uncovered scenarios and business impact, then delivers a
-  consolidated specification, a quoted before/after changelog, and a prioritized list of what still
-  needs improving. Stops before design and engineering
-- `/sdlc-review [target]` — the whole review phase in one command: verify once, five lenses in
-  parallel, then merge, deduplicate, fix mechanically, and sign off. Works on a feature slug, a
-  branch, a PR number, a path, or the working diff
-- `/sdlc-status [slug]` — position, gates, issues, investigations, and the next action
-- `/sdlc-init` — set up a project and learn its conventions
+- **Nobody signs off on their own work.** Fix authority is bounded — a reviewer may fix a typo,
+  never a logic defect, because an agent that fixes a defect becomes its author and no
+  independent judge remains. Only the release gate declares ship-readiness, and it audits
+  everyone else's sign-off rather than trusting it.
+- **Every sign-off must state what it did *not* verify.** A sign-off with no stated limits is a
+  claim of omniscience. The release gate reads that line hardest.
+- **Tests are specified before the code, by someone who is not the implementer.** An implementer
+  who writes their own cases tests what they built rather than what was asked. QA authors the plan
+  from the acceptance criteria with no implementation to look at; the architect and product owner
+  review it for missing failure modes and uncovered criteria; only then do the cases become
+  scheduled work. Later, a lens checks that each test *asserts what the plan required* — a test
+  narrowed to fit the implementation is a blocker, because it manufactures confidence.
+- **Symptoms are not causes.** Any defect whose cause is not visible goes to a debugger that must
+  *prove* the cause — make the defect appear and disappear on demand — and report three separate
+  things: the proximate cause, the root cause that permitted it, and the detection gap that let it
+  through. An issue reopened twice cannot be fixed again without an investigation.
+- **Agents coordinate through the filesystem, not conversation.** Everything is on disk, so a run
+  is resumable across sessions, inspectable by hand, and diffable in git next to the code it
+  produced. See [ADR-0001](docs/adr/0001-filesystem-as-agent-communication-bus.md).
+- **Verification claims are checked, not believed.** The review lead re-runs the build and suite
+  and compares reality against what the implementer claimed. A claim of passing tests that do not
+  pass is a blocker, because downstream agents were handed false information.
 
-Work runs in parallel wherever it is genuinely independent: the research sweeps, the two
-test-plan reviewers, implementers on file-disjoint tasks, one debugger per symptom cluster, and
-**five review lenses at once** — correctness, security, performance, test honesty, and
-architectural compliance. A review lead brackets that fan-out: it runs the build and suite once so
-five agents do not collide on ports and fixtures, then merges the lenses, deduplicates findings
-that share a cause, allocates issue ids, and signs off with what nobody verified stated
-explicitly.
+## Commands
 
-See [docs/sdlc/README.md](docs/sdlc/README.md) for the flow diagram and the role table, and
-[ADR-0001](docs/adr/0001-filesystem-as-agent-communication-bus.md) for why agents coordinate
-through the filesystem.
+| Command | What it does |
+|---|---|
+| `/sdlc <request>` | The full pipeline, cycling until every gate passes or it escalates |
+| `/sdlc-product <request \| PRD \| stories>` | Specification work only — four parallel lenses, then a consolidated spec, a quoted before/after changelog, and a prioritized list of what still needs improving. Stops before design and engineering |
+| `/sdlc-review [target]` | The whole review phase alone — a feature, branch, PR number, path, or the working diff |
+| `/sdlc-bug <report>` | The root-cause path, with every verification gate intact |
+| `/sdlc-status [slug]` | Position, gates, issues, investigations, and the next action |
+| `/sdlc-init` | Set up a project and learn its build, lint, and test commands |
 
----
+Plugin commands are namespaced, so they appear as `/sdlc-pipeline:sdlc`, and so on.
 
-## Use it in your own projects
+## Install
 
-Published at **https://github.com/DevLab-Technologies/claude-sdlc**. The marketplace is named
-`miza-sdlc`, which is the name after the `@` when installing — it is independent of the
-repository name.
-
-### 1. Add the marketplace once, per machine
-
-```bash
-claude plugin marketplace add DevLab-Technologies/claude-sdlc
-```
-
-```bash
-claude plugin install sdlc-pipeline@miza-sdlc
-```
-
-Both are available as `/plugin marketplace add …` and `/plugin install …` inside an
-interactive session. The plugin is now available in **every** project on that machine.
-
-To develop against your working copy instead, add the local directory — it picks up your edits
-as you make them, which is the right setup while you are still tuning the agents:
-
-```bash
-claude plugin marketplace add /Users/elkhayyat/Dev/SDLC
-```
-
-### 2. Initialize each project
-
-From inside a project you want to run the pipeline in:
-
-```bash
-/sdlc-init
-```
-
-This scaffolds `.sdlc/`, installs the ADR template into `docs/adr/`, writes the pipeline
-rules into that project's `CLAUDE.md`, and — the part that matters — records the project's
-real build, lint, test, and dev-server commands into `.sdlc/project-conventions.md`. Agents
-use those commands verbatim, so this step is what stops QA from reporting failures that are
-not real.
-
-Then start work:
-
-```bash
-/sdlc add email and password authentication with session persistence
-```
-
----
-
-## Share it with your team
-
-### Option A — each person installs it (simplest)
-
-Send them two commands:
+Requires Claude Code and git. Nothing else — no services, no API keys, no infrastructure.
 
 ```bash
 claude plugin marketplace add DevLab-Technologies/claude-sdlc
@@ -103,94 +61,57 @@ claude plugin marketplace add DevLab-Technologies/claude-sdlc
 claude plugin install sdlc-pipeline@miza-sdlc
 ```
 
-The repository is public, so no credentials are needed. If you later make it private, access
-uses each person's existing git credentials — `gh auth login`, the macOS Keychain, or an SSH
-key already in `ssh-agent` all work without extra setup.
+`miza-sdlc` is the marketplace id — the part after the `@`. Both commands also work as
+`/plugin marketplace add …` and `/plugin install …` inside a session. **Restart afterward**;
+commands and agents register at session start.
 
-### Option B — per project, automatic (recommended for a team)
-
-Commit this to the **target project's** `.claude/settings.json`. Anyone who trusts the folder
-is prompted to install the marketplace, and the plugin is enabled for them:
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "miza-sdlc": {
-      "source": {
-        "source": "github",
-        "repo": "DevLab-Technologies/claude-sdlc"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "sdlc-pipeline@miza-sdlc": true
-  }
-}
-```
-
-Commit `.sdlc/project-conventions.md` alongside it and the whole team runs the pipeline with
-the same commands, the same gates, and the same history. New joiners get it by cloning.
-
-### Option C — organization-wide
-
-An administrator puts the same `extraKnownMarketplaces` and `enabledPlugins` keys into
-managed settings, and it is registered on every machine with no per-project step. Use this
-once the pipeline has earned its place; Option B is the better place to start, because a
-project can opt out.
-
-For CI or container images, pre-populate the plugin cache at build time with
-`CLAUDE_CODE_PLUGIN_SEED_DIR` so nothing is cloned at runtime.
-
-## How your team gets updates
-
-Push to this repository. Each person then runs:
+Then, from inside a project you want to run it in:
 
 ```bash
-claude plugin update sdlc-pipeline@miza-sdlc
+/sdlc-pipeline:sdlc-init
 ```
 
-Or `/plugin` inside a session, which lists what has an update available.
+That scaffolds `.sdlc/`, installs an ADR template into `docs/adr/`, writes the pipeline rules into
+that project's `CLAUDE.md`, and records the project's **real** build, lint, test, and dev-server
+commands into `.sdlc/project-conventions.md`. Agents use those verbatim, which is what stops QA
+from reporting failures that are not real.
 
-The manifest carries **no `version` field**, deliberately. That puts the plugin on
-commit-tracked versioning: the resolved commit SHA is the version, so every push you make is an
-available update — no version bumping, nothing to remember. This is the right mode while the
-agents are still being tuned.
-
-Two things follow from it:
-
-- **Updates are not automatic.** Nobody's behavior changes until they run `update`. If a change
-  matters, tell them; a pipeline where half the team is on an older protocol produces
-  inconsistent artifacts.
-- **Restart to pick it up.** Commands, agents, and skills register at session start, so an
-  update mid-session takes effect in the next one.
-
-Once the pipeline is stable and you want releases instead of a moving target, add
-`"version": "1.0.0"` back to
-[`plugin.json`](plugins/sdlc-pipeline/.claude-plugin/plugin.json). Installs then pin to that
-string and only move when you bump it.
-
-## Maintaining it
-
-The marketplace name `miza-sdlc` is what your team types after the `@`. Renaming it means
-every existing install has to be redone, so settle it before the team adopts it. The same
-applies to the plugin name `sdlc-pipeline` — it keys `enabledPlugins` and `pluginConfigs`.
-
-This repository is **public**. It carries the maintainer email in both manifests, and the gate
-criteria in the `sdlc-protocol` skill are effectively the team's internal quality standards —
-worth a read before pointing anyone outside the org at it.
-
-Always validate before pushing; a malformed manifest breaks the install for everyone:
+Now run something:
 
 ```bash
-claude plugin validate ./plugins/sdlc-pipeline
+/sdlc-pipeline:sdlc add email and password authentication with session persistence
 ```
+
+Re-running `/sdlc` on an existing feature resumes it rather than starting over.
+
+## How it works
+
+Each feature gets a workspace at `.sdlc/features/<slug>/` holding the artifacts of every phase,
+an append-only `history/events.jsonl`, a full record of every agent run, issues as individual
+files, and `state.json` as the single source of truth for position and gate status. The contract
+for all of it is the `sdlc-protocol` skill, which every agent reads and treats as binding.
+
+A **gate** passes only when the artifact proving it exists — the orchestrator is told never to
+mark a gate from an agent's summary. A **cycle** is one pass of implement → review → QA → UI QA;
+failures become issues, issues get triaged by cause, and the loop repeats until all gates pass
+together or `max_cycles` is hit, at which point it writes an escalation with options instead of
+spinning.
+
+Work runs in parallel where it is genuinely independent — research sweeps, the two test-plan
+reviewers, implementers on file-disjoint tasks, one debugger per symptom cluster, and five review
+lenses at once. Naive parallelism here corrupts state, so the protocol names four hazards and a
+rule for each: parallel agents never allocate global ids (a synthesizer does it afterward), only
+one agent edits per phase, the build and suite run **once** before the fan-out into a file the
+group reads, and only the phase owner touches `state.json`.
+
+[docs/sdlc/README.md](docs/sdlc/README.md) has the flow diagram and the full role table.
 
 ## Cost and speed
 
-The full pipeline is expensive by design — it is buying independent verification, and independence
-costs a second opinion. But it should only cost that when the change warrants it.
+The pipeline is expensive by design — it buys independent verification, and independence costs a
+second opinion. It should only cost that when the change warrants it.
 
-**It scales to the change.** The orchestrator picks a track and records it in `state.json`:
+**It scales to the change.** The orchestrator picks a track and records it:
 
 | Track | Fits | Phases | Lenses |
 |---|---|---|---|
@@ -203,43 +124,98 @@ Two rules stop that becoming a quality hole: escalation is free and always upwar
 finds the track too small says so and it re-tracks — and **security, authorization, payments,
 migrations, and personal data are `standard` at minimum whatever the diff size**.
 
-**Where the tokens actually went, and what changed:**
+Other things that keep cost down: the shared protocol is deliberately small, with role-specific
+checklists living in the one agent that uses them rather than being loaded by all of them;
+mechanical sub-steps run on a cheaper model while every judgment role stays on the default;
+reports are findings-first with no preamble or methodology, which saves tokens writing them and
+again when the lead reads five; and cycle 2 onward reviews the delta, not the whole feature.
 
-- The protocol skill was 6.5k tokens and every agent loaded all of it — about 130k tokens of pure
-  duplication per full run. It is now 3.7k, holding only what is genuinely shared; role-specific
-  checklists moved into the single agent that uses them, where they load once.
-- Mechanical sub-steps run on `sonnet` — intake, research, and the review lead's verify mode, where
-  the work is running commands and recording results. Every judgment role stays on the default,
-  because a cheaper model reviewing security is a false negative waiting to happen.
-- Reports are findings-first with no preamble, no methodology, and no quoting code back at length.
-  That saves tokens twice: writing them, and again when the lead reads five of them.
-- **Cycle 2 and later review the delta**, not the whole feature again, and name the baseline in the
-  sign-off.
-- Agents are handed the specific paths they need. An agent given the workspace reads the workspace.
+**If you want it cheaper still**, the levers with their costs named:
 
-**If you want it cheaper still**, the honest levers, with their costs named:
-
-- Drop `sdlc-review-performance` and `sdlc-review-tests` from the phase 8 fan-out for internal
-  tooling — you lose N+1 and unbounded-growth detection, and the check that tests assert what the
-  plan required.
+- Drop the performance and test lenses from the fan-out for internal tooling — you lose N+1 and
+  unbounded-growth detection, and the check that tests assert what the plan required.
 - Lower `max_cycles` so it escalates to you sooner instead of iterating.
-- Move a lens to `sonnet` in its agent file. Measure before trusting it: the lenses earn their cost
-  on subtle findings, which is exactly what gets lost first.
-- Use `/code-review` instead of `/sdlc-review` on small diffs — one agent instead of seven.
+- Move a lens to a cheaper model in its agent file. Measure before trusting it; lenses earn their
+  cost on subtle findings, which is what gets lost first.
+- Use a single-agent review for small diffs instead of the seven-agent fan-out.
 
-What is not a lever: skipping the release gate, or letting one agent both fix and sign off. Those are
-the pipeline's only defenses against a green light nobody earned.
+What is not a lever: skipping the release gate, or letting one agent both fix and sign off. Those
+are the only defenses against a green light nobody earned.
+
+## For teams
+
+Commit this to a project's `.claude/settings.json` and anyone who trusts the folder is prompted to
+install it, with the plugin enabled for them:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "miza-sdlc": {
+      "source": { "source": "github", "repo": "DevLab-Technologies/claude-sdlc" }
+    }
+  },
+  "enabledPlugins": { "sdlc-pipeline@miza-sdlc": true }
+}
+```
+
+Commit `.sdlc/project-conventions.md` alongside it and everyone runs the same commands, the same
+gates, and the same history. Administrators can put the same two keys in managed settings to cover
+every machine; for CI or container images, pre-populate the plugin cache with
+`CLAUDE_CODE_PLUGIN_SEED_DIR` so nothing is cloned at runtime.
+
+**Updates are not automatic.** Each person runs `claude plugin update sdlc-pipeline@miza-sdlc` and
+restarts. Worth telling people when a change matters — a team split across protocol versions
+produces inconsistent artifacts with no error to signal it.
 
 ## Adapting it
 
-Every agent is a plain markdown file in [`plugins/sdlc-pipeline/agents/`](plugins/sdlc-pipeline/agents).
-Edit them — that is the point.
+Every agent is a plain markdown file in
+[`plugins/sdlc-pipeline/agents/`](plugins/sdlc-pipeline/agents), and every command is one in
+[`commands/`](plugins/sdlc-pipeline/commands). Editing them is the intended use.
 
-- Swap `sdlc-implementer` for a stack specialist and keep the sections on contracts,
-  verification, and the task record.
-- Add a review lens by writing one agent file and adding it to the phase 8 fan-out — it inherits
-  the parallel constraints from protocol section 9.
-- Tune `max_cycles` per feature in `state.json`; lower it for exploratory work so it
-  escalates sooner.
-- The gate criteria in the `sdlc-protocol` skill are where a team's real standards belong.
+- Swap `sdlc-implementer` for a stack specialist; keep its sections on contracts, verification,
+  and the task record.
+- Add a review lens by writing one agent file and adding it to the fan-out. It inherits the
+  parallel constraints from protocol section 9.
+- **The gate criteria in the `sdlc-protocol` skill are where a team's real standards belong.**
   Tighten them there and every agent inherits the change.
+- Tune `max_cycles` per feature; lower it for exploratory work so it escalates sooner.
+
+Validate before you publish a fork — a malformed manifest breaks the install for everyone:
+
+```bash
+claude plugin validate ./plugins/sdlc-pipeline
+```
+
+## Project status
+
+Early, and honest about it. The agents, protocol, and orchestration are complete and the plugin
+validates and installs, but **this has not yet been run end to end on a large real feature**. The
+gate criteria and phase handoffs are where the rough edges will show first.
+
+Known limitations:
+
+- There is no locking on the workspace. Parallel safety comes from declared file ownership and the
+  workplan's conflict-free task sets. If that discipline slips, concurrent writes clobber.
+- Functional QA and UI QA are deliberately sequential; they share one running app and one dataset.
+- Model choices are tuned for quality over cost. Read the cost section before running it on
+  everything.
+
+If you run it on something real, the most useful thing you can report is which gate produced a
+wrong verdict and what the artifacts said at the time.
+
+## Contributing
+
+Issues and pull requests welcome. Two things make a change easy to accept:
+
+1. **Say which failure mode it addresses.** The design is a set of constraints against agents
+   marking their own homework; a change that loosens one should say why the failure it prevents is
+   not a real risk.
+2. **Keep separation of duties intact.** Anything that lets one agent both produce and approve work
+   needs a strong argument, because that is the property everything else rests on.
+
+Run `claude plugin validate ./plugins/sdlc-pipeline` before opening a PR.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
