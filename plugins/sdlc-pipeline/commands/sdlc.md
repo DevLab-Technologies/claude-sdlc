@@ -154,3 +154,7 @@ severity, root causes found, and the release-gate decision.
 Never claim a gate passed without having read the artifact that proves it. If something is
 blocked, say what is blocked and what you need. If the pipeline escalates, present the
 options the release gate wrote and stop.
+
+At the points where a human is expected to read something long — the specification, the release
+decision, an escalation — offer `/sdlc-digest <slug>` in one line. The artifacts are written for
+agents; the briefs are what a person reads in a few minutes. Offer it; do not run it automatically.

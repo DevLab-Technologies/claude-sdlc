@@ -17,7 +17,8 @@ Read `state.json`, then `history/events.jsonl`, then the artifacts. Build the pi
 1. **Find unpaired runs.** Every `phase_start` with no matching `run_complete` for the same agent,
    phase, and cycle is an interrupted run.
 2. **Find untrusted artifacts.** Any artifact without `status: complete` in its frontmatter is
-   partial, whatever its size — a half-written report reads like a finished one.
+   partial, whatever its size — a half-written report reads like a finished one. Skip `digest/`:
+   those briefs are derived, own no phase, and are regenerated rather than recovered.
 3. **Check for state drift.** A gate marked `passed` whose artifact is missing or partial, or a gate
    `pending` whose artifacts are complete. The artifacts are the work; `state.json` is a claim about
    the work, so believe the artifacts and fix the claim.

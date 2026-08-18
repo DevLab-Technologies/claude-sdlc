@@ -36,10 +36,23 @@ state.json  brief.md
 issues/         ISSUE-001.md
 bus/            0001-architect-to-po.md
 history/        events.jsonl  runs/<ts>-<agent>.md
+digest/         feature-brief.md stories-brief.md one-pager.md
 ```
 
 Paths are relative to the repo root. Write only inside your own phase directory plus `issues/`,
-`bus/`, `history/`, and `state.json` — except the architect, who also owns `docs/adr/`.
+`bus/`, `history/`, and `state.json` — except the architect, who also owns `docs/adr/`, and
+`/sdlc-digest`, which owns `digest/` and writes nowhere else in the workspace.
+
+`digest/` is derived, human-facing, and owned by nobody: short briefs generated from the artifacts
+above by `/sdlc-digest`, governed by the `sdlc-digest` skill. It affects no gate and no state, no
+agent reads it as input, and deleting it costs nothing but regeneration. Never digest a digest, and
+never let a brief stand in for the artifact it summarizes.
+
+**`digest/` is outside 3a.** The interruption machinery below does not apply to it: a brief left
+`partial` by a killed session is regenerated on the next `/sdlc-digest`, never quarantined, and
+never reported as an interrupted run. It has no owning agent to re-run and logs no events, so
+treating it as pipeline output sends the recovery path looking for something that was never there.
+Every scan for unpaired runs or partial artifacts skips this directory.
 
 Standalone runs with no feature behind them go to `.sdlc/reviews/<date>-<target>/` or
 `.sdlc/product/<date>-<slug>/`, same file-per-lens layout, no gate to set.

@@ -12,6 +12,7 @@ implementation, and verification, and it leaves as reviewed, tested, traceable w
 | `/sdlc-bug <report>` | A defect — root-cause path with the verification gates intact |
 | `/sdlc-product <request or PRD>` | Specification work alone — review and improve a request, PRD, or stories |
 | `/sdlc-review [target]` | The full parallel review alone — a feature, branch, PR, path, or working diff |
+| `/sdlc-digest [slug]` | The long artifacts as short briefs — for reading, sharing, and deciding |
 | `/sdlc-status [slug]` | Where everything stands and what runs next |
 | `/sdlc-resume [slug]` | After an interrupted run — diagnose, quarantine partials, continue |
 | `/sdlc-init` | Re-run after the project's stack or commands change |

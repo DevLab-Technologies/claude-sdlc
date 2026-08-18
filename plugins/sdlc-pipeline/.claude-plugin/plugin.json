@@ -16,7 +16,8 @@
     "code-review",
     "qa",
     "debugging",
-    "root-cause-analysis"
+    "root-cause-analysis",
+    "human-readable-briefs"
   ],
   "license": "MIT",
   "repository": "https://github.com/DevLab-Technologies/claude-sdlc",
