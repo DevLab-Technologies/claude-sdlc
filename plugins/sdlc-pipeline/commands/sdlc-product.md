@@ -140,8 +140,9 @@ Show the human the outcome, not a description of the outcome:
 7. **What is ready** — whether `/sdlc <slug>` can pick this up at the design phase, or whether it
    needs another product pass or a human answer first.
 
-Then offer, in one line, to print the full `specification.md` in the conversation — some people want
-it in front of them rather than in a file.
+Then offer, in one line each: to print the full `specification.md` in the conversation — some people
+want it in front of them rather than in a file — and to run `/sdlc-digest <slug>` for the two-minute
+brief, which is the version worth sending to anyone who is not going to read a specification.
 
 Do not claim the specification is complete. Say what it now covers and what remains open — a PRD
 presented as finished when its central assumption is unevidenced is worse than one that names the

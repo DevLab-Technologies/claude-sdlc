@@ -36,10 +36,16 @@ state.json  brief.md
 issues/         ISSUE-001.md
 bus/            0001-architect-to-po.md
 history/        events.jsonl  runs/<ts>-<agent>.md
+digest/         feature-brief.md stories-brief.md one-pager.md
 ```
 
 Paths are relative to the repo root. Write only inside your own phase directory plus `issues/`,
 `bus/`, `history/`, and `state.json` — except the architect, who also owns `docs/adr/`.
+
+`digest/` is derived, human-facing, and owned by nobody: short briefs generated from the artifacts
+above by `/sdlc-digest`, governed by the `sdlc-digest` skill. It affects no gate and no state, no
+agent reads it as input, and deleting it costs nothing but regeneration. Never digest a digest, and
+never let a brief stand in for the artifact it summarizes.
 
 Standalone runs with no feature behind them go to `.sdlc/reviews/<date>-<target>/` or
 `.sdlc/product/<date>-<slug>/`, same file-per-lens layout, no gate to set.

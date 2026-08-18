@@ -44,6 +44,7 @@ independent ever checks. This pipeline is mostly a set of constraints against th
 | `/sdlc-product <request \| PRD \| stories>` | Specification work only — four parallel lenses, then a consolidated spec, a quoted before/after changelog, and a prioritized list of what still needs improving. Stops before design and engineering |
 | `/sdlc-review [target]` | The whole review phase alone — a feature, branch, PR number, path, or the working diff |
 | `/sdlc-bug <report>` | The root-cause path, with every verification gate intact |
+| `/sdlc-digest [slug \| path]` | The long artifacts as short briefs a human can read in minutes — feature, stories, design, tests, status, release, and a one-pager |
 | `/sdlc-status [slug]` | Position, gates, issues, investigations, and the next action |
 | `/sdlc-resume [slug]` | Diagnose an interrupted run, quarantine partial output, re-run only what died |
 | `/sdlc-init` | Set up a project and learn its build, lint, and test commands |
@@ -114,6 +115,25 @@ lenses at once. Naive parallelism here corrupts state, so the protocol names fou
 rule for each: parallel agents never allocate global ids (a synthesizer does it afterward), only
 one agent edits per phase, the build and suite run **once** before the fan-out into a file the
 group reads, and only the phase owner touches `state.json`.
+
+### Artifacts agents can act on, briefs people can read
+
+The artifacts are written for agents: complete, numbered, traceable, and long. A specification that
+a reviewer three cycles later can rely on is not a document anyone reads on a Tuesday afternoon.
+
+`/sdlc-digest` derives short briefs from them into `.sdlc/features/<slug>/digest/` — a feature brief
+from the specification, a story brief, a design brief, a coverage brief from the test plan, a status
+brief from review and QA, and a one-pager over all of it. Each states its reading time, leads with
+the answer rather than the background, and ends with what it left out. The skill also carries the
+vocabulary and sentence shapes that make writing read as generated, and every brief is checked
+against that list — a summary that sounds like a brochure gets skimmed, and its facts get discounted
+along with its voice.
+
+Compression is bounded by one rule: it cuts explanation, never obligation. Open questions, risks,
+blockers, deferrals, costs and deadlines survive at every budget, and nothing may be inferred to
+fill a gap the source left — a specification with no success metric produces a brief that says the
+metric is missing. The briefs are derived and non-authoritative: no agent reads them, no gate
+depends on them, and deleting the directory costs nothing but regeneration.
 
 [docs/sdlc/README.md](docs/sdlc/README.md) has the flow diagram and the full role table.
 

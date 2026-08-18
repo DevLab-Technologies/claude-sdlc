@@ -173,6 +173,8 @@ proof the cause was never found.
 - `.sdlc/features/<slug>/issues/` — every finding, one file each
 - `.sdlc/features/<slug>/06-test-plan/plan.md` — the binding test contract
 - `.sdlc/features/<slug>/11-investigations/` — root-cause investigations
+- `.sdlc/features/<slug>/digest/` — short human-facing briefs derived by `/sdlc-digest`; read by
+  people, never by agents, and safe to delete
 - `docs/adr/` — architecture decision records, repo-wide
 
 ## Adapting it
