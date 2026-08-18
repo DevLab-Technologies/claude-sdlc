@@ -115,15 +115,20 @@ Hard ceilings. A digest that runs over is not finished — it is unedited.
 | Source | Digest | Ceiling | Stated as |
 |---|---|---|---|
 | `prd.md` / `specification.md` | Feature brief | 400 words | 2 min read |
-| `stories/*` + `backlog.md` | Story brief | index table + 50 words per story | 3 min read |
+| `stories/*` + `backlog.md` | Story brief | index table + 50 words per story | count it |
 | `architecture.md` + `interfaces.md` + ADRs | Design brief | 350 words | 2 min read |
 | `06-test-plan/plan.md` | Test brief | coverage table + 150 words | 1 min read |
 | `08-review/*` + `09-qa/*` | Status brief | 250 words | 1 min read |
 | `10-release/*` | Release brief | 200 words | 1 min read |
 | Whole feature | One-pager | 500 words, all of the above compressed further | 3 min read |
 
-State the reading time on line two. If the honest count exceeds the ceiling because the obligations
-alone fill it, keep them and say `over budget: N open items` — never trim an obligation to fit.
+State the reading time on line two, derived from what you actually wrote at roughly 250 words a
+minute, rounded up to the half minute. The times in the table are what a fixed budget works out to;
+never copy one onto a brief whose ceiling scales, because a 24-story index labelled `3 min read`
+teaches the reader to distrust every other brief's number.
+
+If the honest count exceeds the ceiling because the obligations alone fill it, keep them and say
+`over budget: N open items` — never trim an obligation to fit.
 
 ## 6. Shapes
 
@@ -132,14 +137,25 @@ Each digest is a file with this frontmatter, then the body:
 ```markdown
 ---
 digest_of: 02-product/specification.md
-source_state: <git sha, or file mtime if uncommitted>
+source_state: <`git hash-object <source path>`, or mtime and byte size if untracked>
 generated_for: feature <slug>, cycle <n>
-status: complete
+status: partial          # flipped to `complete` in your final write
 ---
 ```
 
+Write `status: partial` from the moment you create the file and flip it to `complete` last, as
+protocol 3a requires of any artifact. A partial brief is **not** an interrupted pipeline run: the
+recovery path ignores `digest/` entirely, so an unfinished brief is overwritten on the next run
+rather than quarantined, and it never makes `/sdlc-status` report the feature as interrupted.
+
 `source_state` is what makes staleness detectable. A digest whose source has moved on is a lie with
 a timestamp, so record what you read and check it before trusting an existing digest.
+
+It is the hash of **that source file's own content**, never `HEAD` and never a commit sha. A
+repo-wide sha changes on every unrelated commit, which would mark every brief stale and regenerate
+all of them to produce identical text, and it survives a checkout that quietly changed the file
+underneath. One source per digest, one hash per source; a brief built from several sources records
+one line per source.
 
 ### Feature brief — from a PRD or specification
 

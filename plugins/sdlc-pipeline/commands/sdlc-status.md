@@ -21,8 +21,9 @@ For each feature, read `state.json`, `history/events.jsonl`, `issues/*.md`,
 - **Waiting on** — unanswered blocking bus messages and unanswered human questions, quoted
 - **Recent activity** — the last five events from the log, one line each
 - **Next action** — the exact agent to run next, and why
-- **Interrupted runs** — any unpaired `phase_start`, or artifact lacking `status: complete`. Say plainly
-  that `/sdlc-resume` is needed rather than reporting the position as if the run finished
+- **Interrupted runs** — any unpaired `phase_start`, or artifact lacking `status: complete`, ignoring
+  `digest/` since those briefs are derived and regenerated, not recovered. Say plainly that
+  `/sdlc-resume` is needed rather than reporting the position as if the run finished
 
 If this is a cross-repo program (`spec-link.md` or `participants.json` present), also report:
 

@@ -41,6 +41,14 @@ For a feature, pick the brief types from what exists and is `status: complete`:
 
 Produce `one-pager.md` whenever two or more briefs exist — it is what most people will actually read.
 
+**In a participating repo, the sources are not all local.** If `spec-link.md` is present, the
+product, design, and architecture artifacts live in the shared workspace, and only
+`07-implementation/`, `08-review/`, `09-qa/`, `issues/` and `participants/self.md` are here. Resolve
+`spec-link.md` and read the shared workspace at the commit it records, so the feature, story, and
+design briefs come from there while the status brief comes from this repo. Cannot reach it? Say so
+in one line and produce the local briefs — do not silently skip the three that answer *what are we
+building*, which is why someone ran this.
+
 For a cross-repo program (`participants.json` or `spec-link.md` present), add `program-brief.md`:
 who is building what, which contract version each repo targets, where the drift is, and what the
 deploy order will be. Drift is the point — name any repo building against a superseded contract in
@@ -101,7 +109,10 @@ Then, briefly:
 
 ## Boundaries
 
-Read-only on everything except `digest/`. This command does not review, revise, approve, or advance
-anything, and it never states or implies ship-readiness — a brief reports a verdict that already
-exists, and reaches none of its own. If a source document is wrong, the fix belongs with the agent
-that owns it, not here.
+**It writes briefs and nothing else.** Two destinations, both from step 3: `digest/` for a feature,
+or `<name>-brief.md` beside the source for a document inside this repository. Every other file it
+touches it only reads — no source, no state, no gate, no issue, no event.
+
+This command does not review, revise, approve, or advance anything, and it never states or implies
+ship-readiness — a brief reports a verdict that already exists, and reaches none of its own. If a
+source document is wrong, the fix belongs with the agent that owns it, not here.
