@@ -129,9 +129,12 @@ vocabulary and sentence shapes that make writing read as generated, and every br
 against that list — a summary that sounds like a brochure gets skimmed, and its facts get discounted
 along with its voice.
 
-Compression is bounded by one rule: it cuts explanation, never obligation. Open questions, risks,
-blockers, deferrals, costs and deadlines survive at every budget, and nothing may be inferred to
-fill a gap the source left — a specification with no success metric produces a brief that says the
+Compression is bounded by one rule: it cuts explanation, never obligation or inventory. Open
+questions, risks, blockers, deferrals, costs and deadlines survive at every budget, and so does the
+full list of what is being built — every requirement, every story with its acceptance criteria,
+every edge case, every dependency. The word ceilings bound the prose around that list, not the list,
+so a brief for a big feature is longer and still reads in minutes, because length in a table costs
+the reader almost nothing. Nothing may be inferred to fill a gap the source left — a specification with no success metric produces a brief that says the
 metric is missing. The briefs are derived and non-authoritative: no agent reads them, no gate
 depends on them, and deleting the directory costs nothing but regeneration.
 

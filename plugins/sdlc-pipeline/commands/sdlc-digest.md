@@ -79,8 +79,11 @@ cost nothing but regeneration.
 
 The four rules from the skill are the ones to hold under pressure, so hold them literally:
 
-1. Cut explanation, never obligation. Open questions, risks, blockers, deferrals, costs and
-   deadlines survive at every budget.
+1. Cut explanation, never obligation or inventory. Open questions, risks, blockers, deferrals,
+   costs and deadlines survive at every budget — and so does the full list of what is being built:
+   every requirement, every story with its acceptance criteria, every edge case and failure
+   behavior, every dependency. Ceilings bound the prose around that list, never the list. Nine
+   requirements do not become "the main flows".
 2. Add nothing. No inference, no resolved ambiguity, no filled gap. `not stated` where the source
    is silent.
 3. Answer first. No preamble, ever.

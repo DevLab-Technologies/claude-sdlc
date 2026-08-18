@@ -21,8 +21,10 @@ It fails the moment they have to open the source file to answer one of those.
 
 ## 2. The four compression rules
 
-**Rule 1 — Cut explanation, never obligation.** Reasoning, methodology, restatement, hedging and
-process language are compressible to nothing. These are not, at any budget:
+**Rule 1 — Cut explanation, never obligation or inventory.** Reasoning, methodology, restatement,
+hedging and process language are compressible to nothing. Two other things are not.
+
+**The obligations**, at any budget:
 
 - open questions and anything awaiting a human decision
 - risks, and the blast radius of each
@@ -31,8 +33,23 @@ process language are compressible to nothing. These are not, at any budget:
 - costs, deadlines, and dependencies on other teams or repos
 - anything the reader is being asked to approve, pay for, or accept
 
-If the budget cannot hold all of them, the digest says so in `Omitted` and keeps the obligations.
-A brief that lost a blocker is worse than no brief, because it was believed.
+**The inventory** — the complete list of what is being built, one line each, none dropped:
+
+- every functional requirement, or the story that carries it
+- every user story, with its acceptance criteria as plain outcomes
+- every edge case and failure behavior the source names: what the user sees when it goes wrong
+- every non-functional requirement a user would notice — speed, limits, permissions, offline,
+  accessibility, what happens at scale
+- every dependency, and everything explicitly out of scope
+
+Nine requirements do not become "the main flows". Fourteen edge cases do not become "various error
+states". Summarizing an inventory is how a brief ends up describing a different, smaller feature
+than the one being built, and the reader cannot tell, because what is missing left no trace.
+
+If the budget cannot hold the prose around all of this, cut the prose. If it still does not fit,
+say so in `Omitted` and keep the obligations and the inventory. A brief that lost a blocker is worse
+than no brief, because it was believed; a brief that lost four requirements is worse still, because
+it will be approved.
 
 **Rule 2 — Add nothing.** Every fact traces to the source. You may reorder, merge, and drop; you may
 not infer, resolve, complete, or improve. Where the source is ambiguous, the digest is ambiguous:
@@ -44,7 +61,10 @@ scope, or what the document contains. `Sign-in with email, so returning users st
 Three stories, none started, one open decision on session length.` — then the detail.
 
 **Rule 4 — Say what you dropped.** Every digest ends with `Omitted`: the sections summarized away,
-in one line each, so a reader knows what exists that they are not seeing.
+in one line each, so a reader knows what exists that they are not seeing. It covers explanation and
+detail — the rationale behind a requirement, the alternatives considered, the research it rests on.
+It is not a place to record requirements, stories, criteria or edge cases you left out, because
+under Rule 1 you did not leave any out.
 
 ## 3. Plain-language mechanics
 
@@ -110,17 +130,31 @@ touch, and a lively brief that added a fact is still a broken brief.
 
 ## 5. Budgets
 
-Hard ceilings. A digest that runs over is not finished — it is unedited.
+**Ceilings apply to prose, not to inventory.** Requirement lines, story rows, acceptance criteria,
+edge cases and dependencies are outside the word count entirely — a table of 14 one-line
+requirements is scannable in seconds, and cutting it to 5 is not compression, it is loss. What the
+ceilings bound is everything around them: framing, explanation, context, transitions.
 
-| Source | Digest | Ceiling | Stated as |
+So a brief for a large feature is longer than one for a small feature, and that is correct. It is
+still effortless to read, because length in a table costs the reader almost nothing while length in
+paragraphs costs them everything.
+
+A digest whose prose runs over is not finished — it is unedited.
+
+| Source | Digest | Prose ceiling, on top of the full inventory | Stated as |
 |---|---|---|---|
-| `prd.md` / `specification.md` | Feature brief | 400 words | 2 min read |
-| `stories/*` + `backlog.md` | Story brief | index table + 50 words per story | count it |
-| `architecture.md` + `interfaces.md` + ADRs | Design brief | 350 words | 2 min read |
-| `06-test-plan/plan.md` | Test brief | coverage table + 150 words | 1 min read |
+| `prd.md` / `specification.md` | Feature brief | 400 words | count it |
+| `stories/*` + `backlog.md` | Story brief | 50 words per story, criteria excluded | count it |
+| `architecture.md` + `interfaces.md` + ADRs | Design brief | 350 words | count it |
+| `06-test-plan/plan.md` | Test brief | 150 words | 1 min read |
 | `08-review/*` + `09-qa/*` | Status brief | 250 words | 1 min read |
 | `10-release/*` | Release brief | 200 words | 1 min read |
-| Whole feature | One-pager | 500 words, all of the above compressed further | 3 min read |
+| Whole feature | One-pager | 500 words total, and it links out | 3 min read |
+
+The one-pager is the exception that proves the split: it is genuinely a summary, so it **does**
+compress the inventory — a count and the headline items rather than every line. That is only safe
+because it names the brief holding the full list beside every section it compresses. It is the way
+in, never the whole picture, and it never ships as the only brief.
 
 State the reading time on line two, derived from what you actually wrote at roughly 250 words a
 minute, rounded up to the half minute. The times in the table are what a fixed budget works out to;
@@ -168,10 +202,29 @@ one line per source.
 **Who it is for** the user group, and roughly how many.
 
 ## What it does
-Up to five bullets, one line each, user-visible behavior only.
+Every functional requirement, one line each, in user-visible terms. All of them — group them under
+sub-headings if there are many, but never truncate the list. Carry the `FR-` id only where a reader
+may need to look one up.
+
+## What happens when things go wrong
+Every edge case and failure behavior the source names, as: the situation, then what the user sees.
+Two columns, one row each. This is the section people skip writing and the section that decides
+whether the thing is usable, so it is never summarized into "error states are handled". Where the
+source names an edge case but not the behavior, write the situation and `behavior not stated` —
+that gap is the most useful thing on the page.
+
+## What it must do well
+The non-functional requirements a user would notice: speed, limits, who can see what, offline,
+accessibility, behavior at scale. One line each, with the number where the source gives one.
+Omit the ones that are purely internal.
 
 ## What it does not do
 The non-goals, one line each. Readers relax when this list exists.
+
+## Depends on
+Other teams, other repos, external services, and anything that has to land first. One line each,
+with who owns it. Absent from the source means `no dependencies stated`, which is itself worth
+knowing.
 
 ## How we will know it worked
 The metric, its baseline, its target, and when it is measured. If any of those is missing from
@@ -181,10 +234,15 @@ the source, write `not stated` rather than filling the gap.
 Numbered, each answerable in one message, each with the default that applies if nobody answers.
 
 ## Risks
-Top three only, each as: what could happen, and what it would cost.
+Every risk the source records, ordered by what it would cost, each as: what could happen, and what
+it would cost. Where there are more than six, keep all of them and drop to one clause each.
 
 ## Omitted
 ```
+
+Nothing in that shape is optional because the feature is small. A section with no content in the
+source gets one line saying the source does not cover it — an absent section reads as "there was
+nothing to say", which is a different claim entirely.
 
 ### Story brief — from the stories and the backlog
 
@@ -194,26 +252,41 @@ Lead with the index, because the shape of the work is the thing a human wants fi
 |---|---|---|---|---|
 | STORY-003 | Returning users sign in with email and password | P0 | M | in progress |
 
-Then a card per story, `P0` first, at most 50 words each: the one-line story, the acceptance
-criteria as plain outcomes (not Given/When/Then — that form is for QA, not for reading), and any
-open question on that story. Stories at `P2` get the index row only, unless one carries an open
-decision.
+Then a card for **every** story, `P0` first — not just the big ones, not just the ones in this
+cycle:
 
-Never renumber, never merge two stories into one row, and never drop a story because it is small.
-The count has to match the backlog, and a reader will check.
+- the story in one line
+- **every** acceptance criterion, as a plain outcome. Strip the Given/When/Then scaffolding, which
+  is a form for QA rather than for reading, but keep the substance of each one: `wrong password
+  shows one error and clears the field` carries the same fact as the three-clause version at a
+  third of the length. Never merge two criteria, and never replace a list of seven with "validation
+  rules apply"
+- anything out of scope for that story, where the source says so
+- any open question on that story
+
+50 words is the target for a card, not a cap that licenses dropping criteria. A story with eleven
+criteria gets a longer card; a story with two gets a shorter one.
+
+Never renumber, never merge two stories into one row, and never drop a story because it is small or
+low priority. The count has to match the backlog, and a reader will check.
 
 ### Design brief — from the architecture
 
-The approach in three sentences. Then the pieces as a table — component, what it does, who calls it.
-Then decisions: one line per ADR, each stating the choice **and what it costs**, because a decision
-without its trade-off reads as free. Then what is risky or reversible-at-a-price. No code, no
+The approach in three sentences. Then **every** component as a table row — component, what it does,
+who calls it — not the interesting ones. Then decisions: one line per ADR, each stating the choice
+**and what it costs**, because a decision without its trade-off reads as free. Then what is risky or
+reversible-at-a-price, and every contract or boundary another team has to build against. No code, no
 interface signatures, no directory trees — those are what the source is for.
 
 ### Test brief — from the test plan
 
 Coverage per story as a table: story, cases, what level, and what is not covered. Then, in words,
-the parts nobody is testing and why. A test brief exists to make the gaps visible; if the digest
-reads as reassurance, it is wrong.
+the parts nobody is testing and why.
+
+Say explicitly how many cases are negative, error, boundary, concurrency, security, and
+accessibility — a plan that is 90% happy path is the single most useful thing this brief can
+surface, and a raw case count hides it. Name every acceptance criterion with no case against it.
+A test brief exists to make gaps visible; if it reads as reassurance, it is wrong.
 
 ### Status brief — from review and QA
 
@@ -233,7 +306,9 @@ Read your own digest cold and answer these. Any `no` means it is not done:
 2. Can a reader who has seen nothing else act on this?
 3. Does every fact appear in the source? Point at where, for the three most load-bearing.
 4. Did every open question, risk, blocker, deferral and deadline survive?
-5. Do the counts match — stories, issues, open questions?
+5. Do the counts match the source — requirements, stories, acceptance criteria, edge cases, issues,
+   open questions? Count them, do not estimate. This is the check that catches a brief describing a
+   smaller feature than the one being built.
 6. Is it inside budget, or honestly marked over?
 7. Is `Omitted` complete enough that nobody is surprised later by what it hides?
 8. Would the artifact's author agree this says what they said?
