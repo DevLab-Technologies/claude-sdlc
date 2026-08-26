@@ -360,6 +360,137 @@
     white-space: nowrap;
   }
 
+  canvas#floor { cursor: default; }
+
+  /* ---------- agent modal ---------- */
+
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 11, 16, 0.62);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+
+  .modal-backdrop.show { display: flex; }
+
+  .modal-card {
+    width: 100%;
+    max-width: 380px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 4px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+
+  .modal-head .who {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .modal-head .who .id {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    word-break: break-word;
+  }
+
+  .modal-head .who .dept {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .modal-status {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+
+  .modal-status.st-working { color: #1a1206; background: var(--signal); }
+  .modal-status.st-resting { color: #0d2019; background: var(--ok); }
+  .modal-status.st-issue   { color: #2a0d0d; background: var(--bad); }
+  .modal-status.st-idle    { color: var(--ink-faint); background: var(--floor); border-color: var(--panel-line); }
+
+  .modal-close {
+    flex: none;
+    background: transparent;
+    border: none;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+
+  .modal-close:hover { color: var(--ink); }
+
+  .modal-now {
+    padding: 12px 16px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    border-bottom: 1px solid var(--panel-line);
+  }
+
+  .modal-now .label {
+    display: block;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .modal-log {
+    overflow-y: auto;
+    padding: 10px 16px 14px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.7;
+  }
+
+  .modal-log .label {
+    display: block;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .modal-log .entry { color: var(--ink-dim); }
+  .modal-log .entry.bad { color: var(--bad); }
+  .modal-log .entry .b::before { content: "▸ "; color: var(--ink-faint); }
+  .modal-log .entry.done .b::before { content: "✓ "; color: var(--ok); }
+  .modal-log .entry.bad .b::before { content: "✕ "; color: var(--bad); }
+  .modal-log .empty { color: var(--ink-faint); font-style: italic; }
+
   @media (max-width: 760px) {
     main { flex-direction: column; }
     aside { max-width: none; border-left: none; border-top: 1px solid var(--panel-line); flex: 1 1 40%; }
@@ -415,6 +546,27 @@
   <button class="ctl" id="btnRestart">↺ restart</button>
   <span class="proto-tag">not wired to a real run — every event below is scripted</span>
 </footer>
+
+<div class="modal-backdrop" id="agentModal">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalId">
+    <div class="modal-head">
+      <div class="who">
+        <div class="id" id="modalId">—</div>
+        <div class="dept" id="modalDept">—</div>
+      </div>
+      <span class="modal-status" id="modalStatus">—</span>
+      <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-now">
+      <span class="label">right now</span>
+      <span id="modalNow">—</span>
+    </div>
+    <div class="modal-log">
+      <span class="label">what it did this run</span>
+      <div id="modalLog"></div>
+    </div>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -485,17 +637,31 @@
   var DESKS = {};                // id -> {x,y,short,dept,state,activeNow,completed,hasOpenIssue}
   var DEPT_LABELS = [];
 
+  // Spread multipliers: the department grid (col 0-8, row 0-4) is deliberately
+  // sparse so desks read as distinct floor zones with real walkways between them,
+  // rather than clustering in one corner of the canvas.
+  var SPREAD_X = 1.6, SPREAD_Y = 1.85;
+
   DEPARTMENTS.forEach(function (dept) {
     var perRow = 3;
     dept.desks.forEach(function (d, i) {
       var dx = i % perRow, dy = Math.floor(i / perRow);
-      var x = ORIGIN_X + (dept.col + dx * 1.15) * TILE;
-      var y = ORIGIN_Y + (dept.row + dy * 1.3) * TILE;
-      DESKS[d.id] = { x: x, y: y, short: d.short, dept: dept.id,
-        state: "idle", activeNow: false, completed: false, hasOpenIssue: false };
+      var x = ORIGIN_X + (dept.col * SPREAD_X + dx * 1.3) * TILE;
+      var y = ORIGIN_Y + (dept.row * SPREAD_Y + dy * 1.3) * TILE;
+      DESKS[d.id] = { x: x, y: y, short: d.short, dept: dept.id, label: d.short,
+        state: "idle", activeNow: false, completed: false, hasOpenIssue: false, log: [] };
     });
-    DEPT_LABELS.push({ x: ORIGIN_X + dept.col * TILE, y: ORIGIN_Y + dept.row * TILE - 20, text: dept.label });
+    DEPT_LABELS.push({ x: ORIGIN_X + dept.col * SPREAD_X * TILE, y: ORIGIN_Y + dept.row * SPREAD_Y * TILE - 20, text: dept.label });
   });
+
+  // Ticker lines address agents by a short form ("review-lead", "code-reviewer").
+  // Map every such form back to its desk id so a click on a desk can show the
+  // lines that were actually about it.
+  var WHO_TO_DESK = {};
+  Object.keys(DESKS).forEach(function (id) { WHO_TO_DESK[id.replace(/^sdlc-/, "")] = id; });
+  WHO_TO_DESK["research-findings"] = "sdlc-researcher-findings";
+  WHO_TO_DESK["research-prior-art"] = "sdlc-researcher-prior-art";
+  WHO_TO_DESK["research-constraints"] = "sdlc-researcher-constraints";
 
   var ROLE_TINT = {
     "sdlc-intake": "#6fa8ff",
@@ -672,11 +838,20 @@
   var counts = { blocker: 0, major: 0, verified: 0 };
   var lastTs = null;
   var raf = null;
+  var hoveredDesk = null;
+  var wasPlayingBeforeModal = true;
+
+  function setPlaying(v) {
+    playing = v;
+    var btn = document.getElementById("btnPlay");
+    btn.classList.toggle("on", playing);
+    btn.textContent = playing ? "⏸ pause" : "▶ play";
+  }
 
   function resetAll() {
     Object.keys(DESKS).forEach(function (id) {
       var d = DESKS[id];
-      d.state = "idle"; d.activeNow = false; d.completed = false; d.hasOpenIssue = false;
+      d.state = "idle"; d.activeNow = false; d.completed = false; d.hasOpenIssue = false; d.log = [];
     });
     gateRailEl.querySelectorAll(".gate-pill").forEach(function (p) { p.className = "gate-pill"; });
     tickerEl.innerHTML = "";
@@ -732,7 +907,14 @@
     if (s.caption) floorCaptionEl.innerHTML = s.caption;
     if (s.current) currentLineEl.innerHTML = s.current;
     if (s.ticker) {
-      s.ticker.forEach(function (t) { addTickerLine(t[0], t[1], t[2]); });
+      s.ticker.forEach(function (t) {
+        addTickerLine(t[0], t[1], t[2]);
+        var deskId = WHO_TO_DESK[t[1]];
+        if (deskId && DESKS[deskId]) {
+          DESKS[deskId].log.push({ kind: t[0], text: t[2] });
+          if (DESKS[deskId].log.length > 10) DESKS[deskId].log.shift();
+        }
+      });
     }
     if (s.sev === "bad") { counts.blocker++; statBlocker.textContent = counts.blocker; }
     if (s.state === "done" && /verified|passing|shipped/.test(JSON.stringify(s.ticker || ""))) {
@@ -775,10 +957,20 @@
   /* ---- rendering ---- */
 
   function drawDept(now) {
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--floor");
+    ctx.fillStyle = "#171f2b";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.strokeStyle = "rgba(255,255,255,0.03)";
+    // floor tile checker — two very close shades read as laid flooring instead
+    // of a flat void, without competing with anything drawn on top of it
+    for (var ty = 0; ty < canvas.height; ty += TILE) {
+      for (var tx = 0; tx < canvas.width; tx += TILE) {
+        var odd = ((Math.round(tx / TILE) + Math.round(ty / TILE)) % 2) === 0;
+        ctx.fillStyle = odd ? "rgba(255,255,255,0.014)" : "rgba(255,255,255,0.03)";
+        ctx.fillRect(tx, ty, TILE, TILE);
+      }
+    }
+
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
     ctx.lineWidth = 1;
     for (var gx = 0; gx <= canvas.width; gx += TILE) {
       ctx.beginPath(); ctx.moveTo(gx + 0.5, 0); ctx.lineTo(gx + 0.5, canvas.height); ctx.stroke();
@@ -787,15 +979,26 @@
       ctx.beginPath(); ctx.moveTo(0, gy + 0.5); ctx.lineTo(canvas.width, gy + 0.5); ctx.stroke();
     }
 
-    ctx.font = "12px 'Silkscreen', monospace";
-    ctx.fillStyle = "#6b7c94";
+    ctx.font = "13px 'Silkscreen', monospace";
+    ctx.fillStyle = "#7b8dab";
     DEPT_LABELS.forEach(function (d) {
       ctx.fillText(d.text, d.x, d.y);
     });
 
     Object.keys(DESKS).forEach(function (id) {
-      drawDesk(DESKS[id], now, id);
+      drawDesk(DESKS[id], now, id, id === hoveredDesk);
     });
+
+    // vignette last, over everything, so the edges recede and the lit desks
+    // read as the brightest thing on the floor
+    var grad = ctx.createRadialGradient(
+      canvas.width / 2, canvas.height / 2, canvas.height * 0.28,
+      canvas.width / 2, canvas.height / 2, canvas.width * 0.72
+    );
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(1, "rgba(0,0,0,0.4)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
   // Resolve the four things a desk can look like. "activeNow" (currently in the
@@ -809,28 +1012,43 @@
     return "idle";
   }
 
-  var GLOW = { idle: "#3a4658", resting: "#2f5a48", issue: "#5a3030",
+  var GLOW = { idle: "#3a4658", resting: "#2c6b52", issue: "#6b2f36",
     working: "#ffb545", done: "#5fd3a0", bad: "#ff6b6b" };
-  var PERSON_TINT = { idle: "#414f66", resting: "#4f8a70", issue: "#a45a5a" };
+  var PERSON_TINT = { idle: "#48597a", resting: "#3fa87d", issue: "#c1595f" };
   var HEAD_IDLE = "#3a4658", HEAD_LIT = "#e6b98c";
+  var OUTLINE = "rgba(9,13,20,0.6)";
 
-  function drawDesk(desk, now, id) {
+  function outline(x, y, w, h) {
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  }
+
+  function drawDesk(desk, now, id, hovered) {
     var x = desk.x, y = desk.y;
     var vis = visualState(desk);
     var w = 40, h = 24;
+    var bodyY = y + 28;
+
+    // chair — grounds the sprite and fills the empty gap behind the desk
+    ctx.fillStyle = "#222c3b";
+    ctx.fillRect(x + 13, bodyY + 20, 14, 10);
+    outline(x + 13, bodyY + 20, 14, 10);
 
     // desk surface
     ctx.fillStyle = "#2b3a4d";
     ctx.fillRect(x, y + 20, w, h);
-    ctx.fillStyle = "#364a63";
+    ctx.fillStyle = "#3c5170";
     ctx.fillRect(x, y + 20, w, 6);
+    outline(x, y + 20, w, h);
 
     // monitor glow — bright while actively resolving, dim-but-colored once settled
     ctx.fillStyle = GLOW[vis] || GLOW.idle;
     ctx.fillRect(x + 6, y + 6, 28, 14);
+    outline(x + 6, y + 6, 28, 14);
     if (vis === "working" || vis === "bad") {
-      ctx.globalAlpha = 0.35 + 0.25 * Math.sin(now / 180 + x);
-      ctx.fillRect(x - 8, y - 2, 96, 30);
+      ctx.globalAlpha = 0.4 + 0.28 * Math.sin(now / 180 + x);
+      ctx.fillRect(x - 10, y - 4, 100, 34);
       ctx.globalAlpha = 1;
     }
 
@@ -839,13 +1057,14 @@
     var tint = (vis === "working" || vis === "done" || vis === "bad")
       ? (ROLE_TINT[id] || "#7c8ba0")
       : (PERSON_TINT[vis] || PERSON_TINT.idle);
-    var bodyY = y + 28;
     var bob = desk.activeNow ? Math.sin(now / 140 + x) * 2 : 0;
 
     ctx.fillStyle = tint;
     ctx.fillRect(x + 12, bodyY + 8 + bob, 16, 14);        // torso
+    outline(x + 12, bodyY + 8 + bob, 16, 14);
     ctx.fillStyle = present ? HEAD_LIT : HEAD_IDLE;
     ctx.fillRect(x + 14, bodyY + bob, 12, 12);            // head
+    outline(x + 14, bodyY + bob, 12, 12);
 
     if (desk.activeNow && desk.state === "working") {
       ctx.fillStyle = "#ffb545";
@@ -865,16 +1084,22 @@
     }
 
     ctx.font = "10px 'Silkscreen', monospace";
-    ctx.fillStyle = present ? "#dce6f0" : "#5b6a82";
-    ctx.fillText(desk.short, x - 2, y + 54);
+    ctx.fillStyle = present ? "#eef2f8" : "#66779a";
+    ctx.fillText(desk.short, x - 2, y + 62);
+
+    if (hovered) {
+      ctx.strokeStyle = "#ffb545";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(x - 12, y - 8, w + 24, 86);
+      ctx.setLineDash([]);
+    }
   }
 
   function draw(now) { drawDept(now); }
 
   document.getElementById("btnPlay").addEventListener("click", function () {
-    playing = !playing;
-    this.classList.toggle("on", playing);
-    this.textContent = playing ? "⏸ pause" : "▶ play";
+    setPlaying(!playing);
   });
 
   document.getElementById("btnSpeed").addEventListener("click", function () {
@@ -884,6 +1109,111 @@
 
   document.getElementById("btnRestart").addEventListener("click", function () {
     resetAll();
+  });
+
+  /* ---- click-to-inspect ---- */
+
+  function canvasPoint(evt) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: (evt.clientX - rect.left) * (canvas.width / rect.width),
+      y: (evt.clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  function deskAt(px, py) {
+    var found = null;
+    Object.keys(DESKS).forEach(function (id) {
+      var d = DESKS[id];
+      if (px >= d.x - 12 && px <= d.x + 52 && py >= d.y - 8 && py <= d.y + 78) found = id;
+    });
+    return found;
+  }
+
+  var DEPT_LABEL_BY_ID = {};
+  DEPARTMENTS.forEach(function (dept) {
+    dept.desks.forEach(function (d) { DEPT_LABEL_BY_ID[d.id] = dept.label; });
+  });
+
+  var modalEl = document.getElementById("agentModal");
+  var modalId = document.getElementById("modalId");
+  var modalDept = document.getElementById("modalDept");
+  var modalStatus = document.getElementById("modalStatus");
+  var modalNow = document.getElementById("modalNow");
+  var modalLog = document.getElementById("modalLog");
+
+  var STATUS_COPY = {
+    working: { cls: "st-working", text: "working" },
+    resting: { cls: "st-resting", text: "done — resting" },
+    issue:   { cls: "st-issue",   text: "unresolved issue" },
+    idle:    { cls: "st-idle",    text: "not started yet" }
+  };
+
+  function openAgentModal(id) {
+    var d = DESKS[id];
+    if (!d) return;
+    var vis = visualState(d);
+    var status = STATUS_COPY[vis] || STATUS_COPY.idle;
+
+    modalId.textContent = id;
+    modalDept.textContent = DEPT_LABEL_BY_ID[id] || d.dept;
+    modalStatus.className = "modal-status " + status.cls;
+    modalStatus.textContent = status.text;
+    modalNow.textContent = d.activeNow
+      ? (currentLineEl.textContent || "active this step")
+      : (vis === "resting" ? "finished its part — waiting for the rest of the cycle."
+        : vis === "issue" ? "left an open finding — waiting on a fix."
+        : "hasn't been reached yet in this run.");
+
+    modalLog.innerHTML = "";
+    if (!d.log.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "nothing logged yet.";
+      modalLog.appendChild(empty);
+    } else {
+      d.log.forEach(function (entry) {
+        var row = document.createElement("div");
+        row.className = "entry" + (entry.kind === "bad" ? " bad" : entry.kind === "done" ? " done" : "");
+        row.innerHTML = '<span class="b"></span>' + entry.text;
+        modalLog.appendChild(row);
+      });
+    }
+
+    wasPlayingBeforeModal = playing;
+    setPlaying(false);
+    modalEl.classList.add("show");
+  }
+
+  function closeAgentModal() {
+    modalEl.classList.remove("show");
+    setPlaying(wasPlayingBeforeModal);
+  }
+
+  canvas.addEventListener("mousemove", function (evt) {
+    var p = canvasPoint(evt);
+    var id = deskAt(p.x, p.y);
+    hoveredDesk = id;
+    canvas.style.cursor = id ? "pointer" : "default";
+  });
+
+  canvas.addEventListener("mouseleave", function () {
+    hoveredDesk = null;
+    canvas.style.cursor = "default";
+  });
+
+  canvas.addEventListener("click", function (evt) {
+    var p = canvasPoint(evt);
+    var id = deskAt(p.x, p.y);
+    if (id) openAgentModal(id);
+  });
+
+  document.getElementById("modalClose").addEventListener("click", closeAgentModal);
+  modalEl.addEventListener("click", function (evt) {
+    if (evt.target === modalEl) closeAgentModal();
+  });
+  document.addEventListener("keydown", function (evt) {
+    if (evt.key === "Escape" && modalEl.classList.contains("show")) closeAgentModal();
   });
 
   resetAll();
