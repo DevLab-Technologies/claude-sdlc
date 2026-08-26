@@ -86,7 +86,9 @@ phase's gate; only the orchestrator does that when opening a cycle.
 One JSON line per meaningful event in `history/events.jsonl`:
 
 ```json
-{"ts":"2026-08-10T14:22:05Z","cycle":2,"agent":"sdlc-review-lead","event":"gate_failed","phase":"08-review","verdict":"failed","summary":"1 blocker (unbounded query), 2 major","artifacts":["08-review/cycle-2/review-summary.md"],"issues_opened":["ISSUE-011"],"next":"sdlc-implementer"}
+{"ts":"2026-08-10T14:20:41Z","cycle":2,"agent":"sdlc-review-security","event":"phase_start","phase":"08-review"}
+{"ts":"2026-08-10T14:22:05Z","cycle":2,"agent":"sdlc-review-security","event":"run_complete","phase":"08-review","duration_ms":84000,"summary":"1 blocker (SEC-2), 0 major","artifacts":["08-review/cycle-2/security.md"]}
+{"ts":"2026-08-10T14:22:11Z","cycle":2,"agent":"sdlc-review-lead","event":"gate_failed","phase":"08-review","verdict":"failed","summary":"1 blocker (unbounded query), 2 major","artifacts":["08-review/cycle-2/review-summary.md"],"issues_opened":["ISSUE-011"],"next":"sdlc-implementer"}
 ```
 
 Events: `phase_start`, `run_complete`, `question_asked`, `question_answered`, `issue_opened`,
@@ -94,6 +96,25 @@ Events: `phase_start`, `run_complete`, `question_asked`, `question_answered`, `i
 `issue_fixed`, `issue_verified`, `issue_reopened`, `adr_recorded`, `test_plan_approved`,
 `test_plan_amended`, `gate_passed`, `gate_failed`, `cycle_opened`, `cycle_closed`, `escalated`,
 `shipped`.
+
+**Timing rides on the same bracket, for free.** You already write `phase_start` before working and
+`run_complete` after — this is the only extra step:
+
+- On `run_complete`, add `"duration_ms"`: the wall-clock gap between your own `run_complete.ts` and
+  your own `phase_start.ts` for this exact agent, phase, and cycle. You already have both
+  timestamps; this is arithmetic, not new instrumentation.
+- On `cycle_closed`, the agent closing the cycle (normally `sdlc-release-gate`) adds
+  `"duration_ms"`: the gap between this `cycle_closed.ts` and the `cycle_opened.ts` for the same
+  cycle number.
+- On `shipped`, add `"duration_ms"`: the gap from the very first event in `history/events.jsonl`
+  to this one — the feature's total wall-clock, start to ship.
+
+**Sum-time and wall-time are different numbers — never conflate them when reporting.** Five review
+lenses each taking 90 seconds is 450 seconds of combined agent-time but roughly 90 seconds of
+wall-clock, because they ran concurrently. Sum-time answers "how much work happened"; wall-time
+(latest `run_complete.ts` minus earliest `phase_start.ts` in the group) answers "how long did we
+actually wait." A report that adds parallel durations and calls it elapsed time is wrong, not just
+imprecise — see `/sdlc-timing` for the reporting rules this drives.
 
 Also write `history/runs/<ISO-ts>-<agent>.md` with frontmatter (`agent`, `phase`, `cycle`,
 `verdict`, `inputs`, `outputs`) and the narrative: what you concluded, what you were uncertain
@@ -399,6 +420,8 @@ them. Write less, without cutting substance:
   handling".
 - Record uncertainty explicitly rather than smoothing it over.
 - Idempotence: revise your output in place for this cycle rather than duplicating it.
+- Bracket every run with `phase_start` and `run_complete`, and put `duration_ms` on the latter
+  (section 3). `/sdlc-timing` and every duration a human ever sees comes from this one field.
 - Never mention tooling or AI assistance in any artifact, commit, or document.
 
 ## 12. Multi-repo programs

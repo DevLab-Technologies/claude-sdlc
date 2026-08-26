@@ -14,6 +14,7 @@ implementation, and verification, and it leaves as reviewed, tested, traceable w
 | `/sdlc-review [target]` | The full parallel review alone — a feature, branch, PR, path, or working diff |
 | `/sdlc-digest [slug]` | The long artifacts as short briefs — for reading, sharing, and deciding |
 | `/sdlc-status [slug]` | Where everything stands and what runs next |
+| `/sdlc-timing [slug]` | Duration breakdown — feature, cycle, agent, and individual run |
 | `/sdlc-resume [slug]` | After an interrupted run — diagnose, quarantine partials, continue |
 | `/sdlc-init` | Re-run after the project's stack or commands change |
 | `/sdlc-program <request>` | A feature spanning several repos — one spec, versioned contracts |

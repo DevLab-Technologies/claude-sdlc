@@ -171,11 +171,25 @@ detection gap — otherwise the same defect returns next cycle wearing a differe
 An issue reopened twice cannot be fixed again without an investigation. Two failed fixes are
 proof the cause was never found.
 
+## How long things take
+
+Every agent's `run_complete` event already carries `duration_ms` — the wall-clock gap between its own
+`phase_start` and `run_complete`, computed from timestamps it already writes. `cycle_closed` and
+`shipped` carry the same field for the cycle and the feature as a whole. No agent does anything extra
+to enable this; it rides on the interruption-and-resume bracketing every agent already does.
+
+`/sdlc-timing` turns that into four views — per feature, per cycle, per agent (sorted by total time,
+so the top row is where the time actually went), and per individual run. The one rule that keeps it
+honest: durations from agents that ran concurrently are never summed and called elapsed time. A
+five-lens review fan-out might be 450 seconds of combined agent-time and 90 seconds of wall-clock —
+the report always states both, and the gap between them is usually the most interesting number in it,
+since it is the parallelism actually paying off.
+
 ## Where things live
 
 - `.sdlc/features/<slug>/` — one workspace per feature; layout in the protocol skill
 - `.sdlc/features/<slug>/state.json` — pipeline position and gate status
-- `.sdlc/features/<slug>/history/events.jsonl` — append-only event log
+- `.sdlc/features/<slug>/history/events.jsonl` — append-only event log, timestamped and durationed
 - `.sdlc/features/<slug>/history/runs/` — every agent run's full outcome
 - `.sdlc/features/<slug>/bus/` — directed questions between agents, each with a default
 - `.sdlc/features/<slug>/issues/` — every finding, one file each

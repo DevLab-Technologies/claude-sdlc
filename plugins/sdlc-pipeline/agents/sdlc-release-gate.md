@@ -57,14 +57,17 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
    record — deferred work that nobody sees is just hidden work.
 
 6. **Decide** and write `10-release/cycle-<n>-decision.md`:
-   - `ship` — all criteria met. Set `status: ready_to_ship`, `gates.release: passed`,
-     append a `shipped` event, and write `10-release/release-notes.md`: what changed in
-     user terms, deferred items, migration or rollout notes, rollback trigger and
+   - `ship` — all criteria met. Append `cycle_closed` for the current cycle first — the last
+     cycle closes too, or its duration never gets recorded — then set `status: ready_to_ship`,
+     `gates.release: passed`, and append `shipped`. Put `duration_ms` on both: `cycle_closed` gets
+     this cycle's `cycle_opened.ts` to now; `shipped` gets the very first event in
+     `history/events.jsonl` to now (protocol section 3). Write `10-release/release-notes.md`:
+     what changed in user terms, deferred items, migration or rollout notes, rollback trigger and
      procedure, and what to watch after release.
    - `another_cycle` — criteria unmet and `cycle < max_cycles`. List exactly which gates
-     failed, which issues must close, and which agents must run. Append `cycle_closed`,
-     then `cycle_opened` for `n+1`, increment `cycle`, and reset the `review`, `qa`, and
-     `ui-qa` gates to `pending`.
+     failed, which issues must close, and which agents must run. Append `cycle_closed` with
+     `duration_ms` (this cycle's `cycle_opened.ts` to now), then `cycle_opened` for `n+1`,
+     increment `cycle`, and reset the `review`, `qa`, and `ui-qa` gates to `pending`.
    - `escalate` — `cycle >= max_cycles`, or the same issue has reopened in three cycles, or
      a contradiction exists that only the human can resolve (conflicting requirements,
      an assumption proven wrong, scope that cannot be met under the constraints). Write
