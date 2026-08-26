@@ -103,6 +103,12 @@ implementation to look at. The architect reviews it for missing failure modes an
 levels; the product owner reviews it for uncovered criteria and wrong expected results. Only an
 approved plan unlocks implementation.
 
+**Authoring starts before architecture finishes.** Most of the plan — the cases derived from
+acceptance criteria and the edge-case checklist — needs only product and design; only the
+failure-mode and error-code cases need `interfaces.md`. So QA begins the moment the UX audit
+passes, running alongside the architect, and folds in the architecture-derived cases once they
+land, before the plan goes to review.
+
 The approved cases then become **scheduled work**: the architect folds each `TC` id into the
 workplan's definition of done, and implementers write those tests alongside the code. QA later
 verifies not just that the tests pass, but that each one actually asserts what the plan said —
