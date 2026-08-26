@@ -768,15 +768,15 @@
       caption: "Five review lenses at once. verify-slow (the suite) runs alongside the four static lenses — only the tests lens actually needs its output.",
       ticker: [["start","review-lead","verify-slow — running suite"],["start","code-reviewer","phase_start"],["start","review-security","phase_start"],["start","review-performance","phase_start"]],
       current: "<span class=\"who\">5 lenses</span> — correctness · security · perf · compliance · verify-slow" }),
-    step(["sdlc-review-security"], { dur: 700, state: "bad", phase: "review",
+    step(["sdlc-review-security"], { dur: 700, state: "bad", phase: "review", gate: "review",
       ticker: [["bad","review-security","SEC-2 — session token compared with ==, not constant-time"]],
       sev: "bad",
       current: "<span class=\"who\">review-security</span> — found SEC-2 (blocker)" }),
     step(["sdlc-review-tests"], { dur: 900, phase: "review", real: 150000,
       ticker: [["start","review-tests","phase_start — after verify-slow landed"]],
       current: "<span class=\"who\">review-tests</span> — checking assertions against the plan" }),
-    step(["sdlc-review-lead"], { dur: 900, state: "done", phase: "review", real: 90000,
-      ticker: [["done","review-lead","synthesize → ISSUE-014 (blocker), 2 minor"]],
+    step(["sdlc-review-lead"], { dur: 900, state: "done", phase: "review", real: 90000, majorDelta: 2,
+      ticker: [["done","review-lead","synthesize → ISSUE-014 (blocker), 2 major"]],
       signoff: "session comparison timing not covered by the plan's existing cases — flagged for a new TC.",
       current: "<span class=\"who\">review lead</span> — synthesized, gate <b>failed</b>" }),
 
@@ -791,6 +791,7 @@
       ticker: [["start","implementer-a","fix mode — ISSUE-014"]],
       current: "<span class=\"who\">implementer</span> — fixing, plus the regression test" }),
     step(["sdlc-review-lead"], { dur: 900, state: "done", gate: "review", phase: "review", real: 120000,
+      blockerDelta: -1, majorDelta: -2,
       ticker: [["done","review-lead","re-verified → 0 blocker, 0 major"]],
       current: "<span class=\"who\">review</span> — passed on cycle 2" }),
 
@@ -823,6 +824,15 @@
 
   var canvas = document.getElementById("floor");
   var ctx = canvas.getContext("2d");
+
+  // Built once — every argument is a constant derived from the canvas's fixed
+  // dimensions, so there is nothing here for a per-frame rebuild to buy.
+  var vignetteGrad = ctx.createRadialGradient(
+    canvas.width / 2, canvas.height / 2, canvas.height * 0.28,
+    canvas.width / 2, canvas.height / 2, canvas.width * 0.72
+  );
+  vignetteGrad.addColorStop(0, "rgba(0,0,0,0)");
+  vignetteGrad.addColorStop(1, "rgba(0,0,0,0.4)");
   var gateRailEl = document.getElementById("gateRail");
   var tickerEl = document.getElementById("ticker");
   var currentLineEl = document.getElementById("currentLine");
@@ -867,7 +877,17 @@
     return h ? (d + "d " + h + "h") : (d + "d");
   }
 
+  var pauseStartedAt = null;
+
   function setPlaying(v) {
+    // stepStart is compared against live wall-clock time, so time spent paused
+    // has to be excluded from that comparison on resume, or the step in progress
+    // when pause was hit gets skipped the instant playback resumes.
+    if (!v && playing) { pauseStartedAt = performance.now(); }
+    else if (v && !playing && pauseStartedAt != null) {
+      stepStart += performance.now() - pauseStartedAt;
+      pauseStartedAt = null;
+    }
     playing = v;
     var btn = document.getElementById("btnPlay");
     btn.classList.toggle("on", playing);
@@ -944,8 +964,12 @@
     }
     if (s.gate) {
       markGateDone(s.gate, s.state === "bad" ? "bad" : "done");
-      var idx = GATES.indexOf(s.gate);
-      if (idx > -1 && idx < GATES.length - 1) setGate(GATES[idx + 1], "active");
+      // Only a real pass advances the rail — a "bad" mark just flags the gate in
+      // place, since the cycle hasn't actually moved on to the next phase yet.
+      if (s.state !== "bad") {
+        var idx = GATES.indexOf(s.gate);
+        if (idx > -1 && idx < GATES.length - 1) setGate(GATES[idx + 1], "active");
+      }
     }
     if (s.caption) floorCaptionEl.innerHTML = s.caption;
     if (s.current) currentLineEl.innerHTML = s.current;
@@ -960,6 +984,14 @@
       });
     }
     if (s.sev === "bad") { counts.blocker++; statBlocker.textContent = counts.blocker; }
+    if (s.blockerDelta) {
+      counts.blocker = Math.max(0, counts.blocker + s.blockerDelta);
+      statBlocker.textContent = counts.blocker;
+    }
+    if (s.majorDelta) {
+      counts.major = Math.max(0, counts.major + s.majorDelta);
+      statMajor.textContent = counts.major;
+    }
     if (s.state === "done" && /verified|passing|shipped/.test(JSON.stringify(s.ticker || ""))) {
       counts.verified++; statVerified.textContent = counts.verified;
     }
@@ -992,7 +1024,7 @@
     if (stepIndex < 0) { nextStep(now); }
     else {
       var s = SCRIPT[stepIndex];
-      if (now - stepStart >= s.dur / speed) nextStep(now);
+      if (s && now - stepStart >= s.dur / speed) nextStep(now);
     }
     draw(now);
   }
@@ -1034,13 +1066,7 @@
 
     // vignette last, over everything, so the edges recede and the lit desks
     // read as the brightest thing on the floor
-    var grad = ctx.createRadialGradient(
-      canvas.width / 2, canvas.height / 2, canvas.height * 0.28,
-      canvas.width / 2, canvas.height / 2, canvas.width * 0.72
-    );
-    grad.addColorStop(0, "rgba(0,0,0,0)");
-    grad.addColorStop(1, "rgba(0,0,0,0.4)");
-    ctx.fillStyle = grad;
+    ctx.fillStyle = vignetteGrad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
@@ -1165,10 +1191,13 @@
   }
 
   function deskAt(px, py) {
+    // Box height must stay under the department row spacing (dy*1.3*TILE = 67.6px
+    // at the current TILE) or adjacent rows' hit-boxes overlap and a click near
+    // the boundary can resolve to the wrong desk.
     var found = null;
     Object.keys(DESKS).forEach(function (id) {
       var d = DESKS[id];
-      if (px >= d.x - 12 && px <= d.x + 52 && py >= d.y - 8 && py <= d.y + 78) found = id;
+      if (px >= d.x - 12 && px <= d.x + 52 && py >= d.y - 4 && py <= d.y + 60) found = id;
     });
     return found;
   }
@@ -1188,6 +1217,8 @@
 
   var STATUS_COPY = {
     working: { cls: "st-working", text: "working" },
+    done:    { cls: "st-resting", text: "just finished" },
+    bad:     { cls: "st-issue",   text: "flagged an issue" },
     resting: { cls: "st-resting", text: "done — resting" },
     issue:   { cls: "st-issue",   text: "unresolved issue" },
     idle:    { cls: "st-idle",    text: "not started yet" }
