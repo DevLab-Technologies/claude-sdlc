@@ -27,7 +27,7 @@ For each feature, read `state.json`, `history/events.jsonl`, `issues/*.md`,
   millisecond figure. Point at `/sdlc-timing` for the per-agent and per-job breakdown rather than
   reproducing it here.
 - **Interrupted runs** — any unpaired `phase_start`, or artifact lacking `status: complete`, ignoring
-  `digest/` since those briefs are derived and regenerated, not recovered. Say plainly that
+  `digest/` and `floor/`, since that output is derived and regenerated, not recovered. Say plainly that
   `/sdlc-resume` is needed rather than reporting the position as if the run finished
 
 If this is a cross-repo program (`spec-link.md` or `participants.json` present), also report:
