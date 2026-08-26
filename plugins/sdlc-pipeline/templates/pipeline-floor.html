@@ -1326,12 +1326,18 @@
       try { applyState(JSON.parse(evt.data)); } catch (e) { /* keep the last good state */ }
     };
     stream.onerror = function () {
-      // The server is gone, or this file was opened straight off disk. Fall back
-      // to the one-shot state.json so the floor still shows the real run, and say
-      // plainly that it has stopped tracking rather than looking live.
-      setStatus("bad", lastState ? "disconnected — showing the last state received" : "no live server — static snapshot");
-      if (stream) { stream.close(); stream = null; }
-      if (!lastState) pollOnce();
+      // EventSource retries on its own. Closing the handle here was what turned
+      // any transient blip — the builder being restarted while the pipeline keeps
+      // running, a dropped keep-alive — into a permanently frozen page. Only give
+      // up when the browser itself has, which is what readyState CLOSED means.
+      if (stream && stream.readyState === EventSource.CLOSED) {
+        stream = null;
+        setStatus("bad", lastState ? "disconnected — showing the last state received" : "no live server — static snapshot");
+        if (!lastState) pollOnce();
+        return;
+      }
+      // Still retrying; say so rather than claiming it is live or dead.
+      setStatus("bad", lastState ? "reconnecting…" : "connecting…");
     };
   }
 
