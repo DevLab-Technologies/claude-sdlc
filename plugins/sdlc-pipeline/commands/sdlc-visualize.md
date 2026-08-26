@@ -15,7 +15,7 @@ its own. Say this plainly in your final report; presenting a replay as live is a
 Invoke the `sdlc-protocol` skill; section 3 defines the event schema and `duration_ms` this whole
 command is built on.
 
-Resolve the feature slug as `/sdlc-status` does: the given slug, or the one feature in
+Resolve the feature slug as `/sdlc-timing` does: the given slug, or the one feature in
 `.sdlc/registry.json`, or ask if there are several. This command needs a real
 `history/events.jsonl` to read — if the feature has no events yet (nothing has run), say so and
 stop rather than generating an empty or fabricated floor.
@@ -52,52 +52,76 @@ instead of a report:
 
 For each step, set:
 
-- `desks`: the agent ids in the group. Real agent ids are already `sdlc-*`, so map them straight to
-  desk ids in `DESKS` — no alias table is needed here (the demo's `WHO_TO_DESK` translation layer
-  existed only because the demo's own ticker text used abbreviated names; real event data doesn't
-  have that problem). An agent id with no matching desk (a role added since this template shipped)
+- `desks`: the agent ids in the group. Most real agent ids are already `sdlc-*` and map straight to
+  desk ids in `DESKS`. `sdlc-implementer` is the one routine exception: `DESKS` only has per-slot
+  `sdlc-implementer-a`/`-b`/`-c` entries, so assign each distinct implementer task in the group to a
+  slot in first-seen order, cycling back to `-a` past three concurrent tasks and noting the collision
+  in `## Gaps`. Any other agent id with no matching desk (a role added since this template shipped)
   gets skipped with a note in `## Gaps`, not silently dropped without comment.
 - `state`: `"working"` if this is the still-in-progress frozen step from Step 1; `"done"` if the
   paired `run_complete` exists and no `gate_failed`/blocker `issue_opened` landed against this
   agent/phase/cycle; `"bad"` if one did.
 - `real`: the actual `duration_ms` (summed across the group's individual durations is wrong here —
   use each desk's own `duration_ms`; if desks in one step have different durations because the
-  group's overlap was partial, attribute each desk its own recorded value, not the group's).
+  group's overlap was partial, attribute each desk its own recorded value, not the group's). `real`
+  has no way to represent "ran, but unrecorded" — it renders identically to `0`, which the template's
+  desk modal shows as "not started yet." When `duration_ms` is genuinely missing, still set `real: 0`
+  but say so in that step's `current` line (e.g. "duration unrecorded") so the replay doesn't read as
+  a desk that never worked, in addition to listing it in `## Gaps`.
 - `phase`: map the event's `phase` directory (`"08-review"`) to the gate name (`"review"`) the
-  template's `GATES` array uses. `sdlc-qa-ui`'s runs count toward `"ui-qa"`, not `"qa"`, even though
-  both may log under the same `phase` directory — resolve by agent id first, phase directory second.
-  `sdlc-debugger` and fix-mode `sdlc-implementer` runs count toward whichever gate is currently
-  contested (the most recent `gate_failed` in this cycle). This is the same approximation the
-  original demo's phase-bucketing already accepted — carry it forward rather than re-deriving a more
-  precise scheme; note it in `## Gaps` once, not per-step.
+  template's `GATES` array uses. Resolve by agent id first, phase directory second, using the
+  Agent → Gate table in `sdlc.md` as the source of truth — it is what puts `sdlc-qa-ui`'s runs toward
+  `"ui-qa"` rather than `"qa"` even though both may log under the same `phase` directory. `sdlc.md`
+  has no entry for `sdlc-debugger` or fix-mode `sdlc-implementer`; treat those as counting toward
+  whichever gate is currently contested (the most recent `gate_failed` in this cycle) — the same
+  approximation the original demo's phase-bucketing already accepted; note it in `## Gaps` once, not
+  per-step.
 - `gate`: set only on the step containing that phase's `gate_passed`/`gate_failed` event, using the
   real event's outcome — this drives the gate-rail coloring the review fixed to actually show `bad`.
 - `ticker`: build from the real event data — `["start", agentShort, "phase_start"]` /
   `["done", agentShort, "run_complete → " + (artifacts joined) ]` / `["bad", agentShort, summary]`.
-  Use the event's own `summary` and `artifacts` fields verbatim where present. Never invent a ticker
-  line's content — an empty or terse real line is more honest than a fabricated detailed one.
+  `agentShort` is the template's `WHO_TO_DESK` key, not the full agent id — strip the `sdlc-` prefix
+  (`"sdlc-review-lead"` → `"review-lead"`); the three research desks use the aliases `WHO_TO_DESK`
+  already defines (`research-findings`/`research-prior-art`/`research-constraints`). Getting this
+  wrong breaks click-to-inspect silently: the desk's log just never receives the line. Use the
+  event's own `summary` and `artifacts` fields verbatim where present. Never invent a ticker line's
+  content — an empty or terse real line is more honest than a fabricated detailed one.
 - `current`: one line describing the step, generated from the same data — not scripted prose.
 - `signoff`: if a `## Sign-off` block's `NOT verified` line is available from the corresponding
   `history/runs/*.md` file for this step's agent, surface it here. This is the single most
   characteristic thing this pipeline does — do not skip it because it takes an extra file read.
 
-Track `cycle` transitions from `cycle_opened`/`cycle_closed` events and update the generated
-script's cycle-badge steps accordingly — a feature past cycle 1 must show that, not always "cycle 1."
+Track `cycle` transitions from `cycle_opened`/`cycle_closed` events. The template's cycle badge is
+hardcoded to two states — it starts at "1" and the first step that carries `gate: "review"` and
+`state: "done"` flips it to "2"; nothing in `SCRIPT` can drive it past that. Make sure the step
+carrying that cycle's own review-gate outcome is set that way so the badge at least distinguishes
+cycle 1 from every cycle after it, and state the feature's real cycle count in your final report and
+in `## Gaps` if it went past 2 — the badge cannot show it, so the report is where that fact has to
+live.
 
 ## Step 3 — Handle skipped and never-reached phases
 
-A `trivial`/`small` track (protocol section 8) skips phases. For a skipped gate, do not synthesize
-a fake step — instead add a small post-processing note in the generated file (reuse the gate-pill
-CSS, add a `.gate-pill.skipped` treatment if the template doesn't already have one styled — check
-before assuming; keep the diff to the template minimal since it's shared, shipped code) showing
-"skipped" instead of a duration. A phase the feature simply hasn't reached yet (still in progress)
-stays in its default unlit state — the template already handles "never activated" correctly.
+A `trivial`/`small` track (protocol section 8) skips phases. For a skipped gate, do not synthesize a
+fake step and do not try to recolor its gate pill — the template only ever sets a pill's class from
+inside `applyStep()` when a `SCRIPT` step carries that `gate`, and there is no `skipped` class or
+code path for one, so reaching into that logic would mean editing the rendering code Step 4 already
+forbids touching. Leave the pill in its default unlit state and call out every skipped gate by name
+in `## Gaps` and in your final report instead — the honest signal here is the written note, not a
+pill color the engine has no way to produce. A phase the feature simply hasn't reached yet (still in
+progress) stays in that same default unlit state — the template already handles "never activated"
+correctly, and a reader tells "skipped" apart from "not yet reached" only via the Gaps note, which
+must say which one it is.
 
 ## Step 4 — Generate and write the file
 
 Take the template's full content, replace only the array literal between `var SCRIPT = [` and its
-closing `];`, and write the result to `.sdlc/features/<slug>/floor/pipeline-floor.html`. This
-directory follows the same rule as `digest/` (protocol section 1): derived, human-facing, outside
+closing `];`, and write the result to `.sdlc/features/<slug>/floor/pipeline-floor.html`. Build each
+entry with the template's own `step(desks, opts)` helper (already defined just above `SCRIPT` in the
+file) rather than a raw object literal — it supplies required defaults, including `dur` (the
+animation's per-step pacing, distinct from `real`), that the fields listed in Step 2 don't cover on
+their own; a raw object literal missing `dur` stalls playback.
+
+This directory follows the same rule as `digest/` (protocol section 1): derived, human-facing, outside
 the interruption-and-resume machinery in 3a — a killed session regenerates it on the next run rather
 than needing recovery, and it affects no gate.
 
