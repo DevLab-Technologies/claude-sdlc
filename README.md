@@ -46,6 +46,7 @@ independent ever checks. This pipeline is mostly a set of constraints against th
 | `/sdlc-bug <report>` | The root-cause path, with every verification gate intact |
 | `/sdlc-digest [slug \| path]` | The long artifacts as short briefs a human can read in minutes — feature, stories, design, tests, status, release, and a one-pager |
 | `/sdlc-status [slug]` | Position, gates, issues, investigations, and the next action |
+| `/sdlc-visualize [slug]` | Render a real feature's history as the Pipeline Floor replay — real agents, real durations, real gate outcomes |
 | `/sdlc-timing [slug]` | How long things took — per feature, per cycle, per agent, per individual run, with wall-clock separated from summed agent-time |
 | `/sdlc-resume [slug]` | Diagnose an interrupted run, quarantine partial output, re-run only what died |
 | `/sdlc-init` | Set up a project and learn its build, lint, and test commands |
