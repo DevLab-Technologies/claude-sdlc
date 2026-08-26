@@ -1,5 +1,5 @@
 ---
-description: Run the full SDLC pipeline for a feature — intake, research, PRD and stories, UX design, UX audit, architecture, implementation, review, QA, UI QA — cycling until every gate passes.
+description: Run the full SDLC pipeline for a feature — intake, research, PRD and stories, UX design, Figma design version, UX audit, architecture, implementation, review, QA, UI QA — cycling until every gate passes.
 argument-hint: <feature request in plain language>
 ---
 
@@ -21,6 +21,21 @@ enforce the gates, and keep the workspace honest.
 3. Otherwise scaffold `.sdlc/features/<slug>/` per the protocol layout, write the request
    verbatim to `brief.md`, initialize `state.json` (`cycle: 1`, all gates `pending`), and
    register the feature in `.sdlc/registry.json`.
+4. Read `.sdlc/figma.json`. **Missing, or `available: unknown`, and the project has a user-facing
+   surface? You are the only participant who can ask** — so ask, but at the right moment:
+
+   > Does this project have Figma design files?
+   > · Yes — I have Figma file URLs · No Figma · Not yet, but we will add them
+
+   Ask it in the message where you present intake's blocking questions, so the human answers
+   everything in one round trip; if intake raises none, ask it as soon as intake returns. Do not
+   ask during setup — intake has not run yet, so there is nothing to batch it with. It must be
+   answered before phase 3b, and nothing before then needs it.
+
+   Verify any URL you are given by reading its metadata before recording it, and write
+   `.sdlc/figma.json` per the `sdlc-figma-design` skill so nobody asks again. `available: false` is
+   a complete answer and the pipeline runs normally on the markdown specification. Never guess:
+   an invented Figma URL is trusted by every agent downstream.
 
 ## Phase 0 and 1 overlap — research does not wait on a human
 
@@ -72,6 +87,7 @@ trust the artifacts, not the agent's summary — and only then proceed.
 | 1 | `sdlc-researcher-findings` + `sdlc-researcher-prior-art` + `sdlc-researcher-constraints`, concurrently | research |
 | 2 | `sdlc-product-owner` | product |
 | 3 | `sdlc-ux-designer` (skip if no user-facing surface — record why) | design |
+| 3b | `sdlc-figma-designer` (skip if no Figma, no access, or no surface — record why) | figma-design |
 | 4 | `sdlc-ux-auditor` | ux-audit |
 | 5 | `sdlc-architect` | architecture |
 | 6 | `sdlc-qa-functional` (plan mode) -> `sdlc-architect` + `sdlc-product-owner` review -> QA revises and approves | test-plan |
@@ -86,6 +102,25 @@ Rules for the sequence:
   `run_complete` after (protocol 3a). That pairing is the only thing that tells a later session which
   runs finished, so never skip it for a phase you expect to be quick.
 - **Stop at a failed gate.** Never run a downstream phase on a failed upstream gate.
+- **Phase 3b runs after phase 4 passes, not alongside it.** The two look independent — both read
+  `03-design/*.md` and write different files — but they collide on two of protocol section 9's
+  hazards: each opens global `ISSUE-<NNN>` files with no synthesizer between them to allocate ids,
+  and each writes its own gate into `state.json`, so the second write drops the first's. Running
+  3b second also means it renders the design the audit actually approved rather than one the audit
+  is about to change. Skip 3b entirely when `.sdlc/figma.json` says `available: false`, when no
+  access path works, or when there is no user-facing surface — mark the gate `skipped` with which
+  of those it was.
+- **A design version is published before implementation, or implementation runs on markdown —
+  never on a draft.** Do not launch phase 7 while `03b-figma/` holds only a `draft` version, and do
+  not let it start against an unresolved `reconciliation.md` conflict on a screen a task touches.
+  Both mean the implementer is building against a guess.
+- **A design change mid-flight invalidates gates, and you are the one who must say so.** If
+  `/sdlc-figma-design` publishes a new version after implementation, reset `implementation`,
+  `review`, `qa`, and `ui-qa` to `pending` in the current cycle and re-run all four. Resetting only
+  the verification gates leaves code built against the superseded version with nothing to rebuild
+  it, and the release gate then fails protocol criterion 10 identically in every later cycle.
+  Implementers re-run against the new version for the screens it changed only — the rest of the
+  workplan stands. Treat it exactly as a code change that stales a sign-off (protocol section 7).
 - **Phase 6 authoring overlaps phase 5.** QA can start the test plan the moment phase 4 (ux-audit)
   passes — its edge-case and acceptance-criteria cases need only product and design, not
   architecture. Launch it alongside phase 5 rather than after it, and have it fold in the
@@ -157,7 +192,10 @@ using protocol section 4 (Triage):
 
 1. Route each issue: obvious cause -> `sdlc-implementer`; unproven, intermittent,
    regression, crash, security, or twice-reopened -> `sdlc-debugger` first; contract
-   violation -> `sdlc-architect`; wrong spec -> `sdlc-product-owner` or `sdlc-ux-designer`.
+   violation -> `sdlc-architect`; wrong spec -> `sdlc-product-owner` or `sdlc-ux-designer`;
+   the design version and the markdown specification disagree -> `sdlc-ux-designer` decides the
+   behavior, then `sdlc-figma-designer` publishes the corrected version. Never route a
+   design conflict to an implementer — it has no authority to pick a side.
 2. Launch the debuggers you need, in parallel, one investigation per distinct symptom
    cluster. Wait for proven root causes.
 3. **Deduplicate by root cause.** If several issues share one `INV`, assign them to a

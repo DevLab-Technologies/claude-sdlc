@@ -49,5 +49,16 @@ design system in the codebase — match it rather than inventing a parallel one.
 `design: passed` when every P0 story has a flow, every screen it touches has a spec with
 all states enumerated and real copy, and accessibility is addressed per screen.
 
-If the project uses Figma, you may read designs via the Figma tools and reconcile your
-spec against them — the file of record is whichever the human names; say which you used.
+## Figma is a separate phase, not yours
+
+You do not open Figma. `sdlc-figma-designer` owns that boundary in both directions and runs after
+you, turning your specification into a versioned design and exporting it into `03b-figma/`.
+
+Write your specification as if no Figma existed, because your files stay authoritative for
+everything a frame cannot express — which states exist, validation, the actual copy strings, focus
+order, accessibility semantics. That is the authority split in the `sdlc-figma-design` skill, and
+it is why the UX audit runs against your files rather than against pictures.
+
+Where a Figma design already existed before you, the figma designer reconciles it against your
+specification and buses you every behavioral difference it found. Answer those in your files; do
+not go looking at the frames yourself and do not weaken a specification to match one.

@@ -34,6 +34,20 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
    you see, and your recommended default. Cap blocking questions at five — if you have
    more, you have not thought hard enough about which ones matter.
 
+3b. **If the feature has a user-facing surface, settle the design source.** Read
+   `.sdlc/figma.json`.
+
+   - `available: true` — name in `00-intake/scope.md` which of those files this feature's screens
+     should live in, if you can tell. If you cannot, that is a **non-blocking** question with the
+     default "the file marked `role: screens`".
+   - `available: false` — nothing to ask. Record that the design will be specified in markdown.
+   - **Missing, or `unknown`** — you cannot ask a human directly, so write a **non-blocking**
+     question: does this project have Figma design files, and what are the URLs? Default: no
+     Figma, design specified in markdown. The orchestrator presents it alongside the blocking
+     questions, and `/sdlc-figma-design link` records the answer.
+
+   Never guess an answer here. A fabricated Figma URL is trusted by every agent downstream.
+
 4. **Write `00-intake/assumptions.md`.** Every assumption gets a rationale and a
    "what breaks if this is wrong" line. This file is the contract for everything
    downstream.

@@ -24,6 +24,9 @@ state.json  brief.md
                 specification.md changes.md recommendations.md
                 review/{product-critique,business-case,ux-review,feasibility}.md
 03-design/      ux-spec.md flows.md screens/<screen>.md design-tokens.md
+03b-figma/      figma-link.md CHANGELOG.md
+                v<N>/{manifest.json,tokens.md,components.md,coverage.md,reconciliation.md}
+                v<N>/screens/<screen>.md  v<N>/shots/<screen>--<state>.png
 04-ux-audit/    audit.md
 05-architecture/architecture.md interfaces.md workplan.md test-strategy.md
 06-test-plan/   plan.md review.md assignments.md
@@ -54,8 +57,9 @@ never reported as an interrupted run. It has no owning agent to re-run and logs 
 treating it as pipeline output sends the recovery path looking for something that was never there.
 Every scan for unpaired runs or partial artifacts skips this directory.
 
-Standalone runs with no feature behind them go to `.sdlc/reviews/<date>-<target>/` or
-`.sdlc/product/<date>-<slug>/`, same file-per-lens layout, no gate to set.
+Standalone runs with no feature behind them go to `.sdlc/reviews/<date>-<target>/`,
+`.sdlc/product/<date>-<slug>/`, or `.sdlc/design/<date>-<slug>/` for a design version with no
+feature attached — same layouts, no gate to set.
 
 ## 2. state.json — the single source of truth
 
@@ -66,10 +70,11 @@ Standalone runs with no feature behind them go to `.sdlc/reviews/<date>-<target>
   "track": "standard",
   "status": "in_progress",
   "gates": { "intake": "passed", "research": "skipped", "product": "passed",
-    "design": "passed", "ux-audit": "passed", "architecture": "passed",
-    "test-plan": "passed", "implementation": "passed", "review": "failed",
-    "qa": "pending", "ui-qa": "pending", "release": "pending" },
+    "design": "passed", "figma-design": "passed", "ux-audit": "passed",
+    "architecture": "passed", "test-plan": "passed", "implementation": "passed",
+    "review": "failed", "qa": "pending", "ui-qa": "pending", "release": "pending" },
   "issues": { "blocker": 1, "major": 2, "minor": 4, "nit": 3 },
+  "design_version": 2,
   "open_questions": 0, "adrs": ["ADR-0001"], "blocked_on": null
 }
 ```
@@ -77,9 +82,38 @@ Standalone runs with no feature behind them go to `.sdlc/reviews/<date>-<target>
 Gates: `pending` | `passed` | `failed` | `skipped`. A `skipped` gate needs a recorded reason.
 Status: `in_progress` | `awaiting_human` | `blocked` | `ready_to_ship` | `shipped`.
 Track: `trivial` | `small` | `standard` | `large` — see section 8.
+`design_version`: the published Figma design version number, or `null` when there is none — see
+section 2a and the `sdlc-figma-design` skill.
 
 Read it before you start; update it as your **last** action, in one write. Never reset another
 phase's gate; only the orchestrator does that when opening a cycle.
+
+## 2a. Two design artifacts, one authority split
+
+A feature may carry a Figma design as well as the markdown design specification. The full contract
+is the `sdlc-figma-design` skill; three rules matter to every agent, whether or not it ever opens
+Figma.
+
+1. **Only `sdlc-figma-designer` talks to Figma.** It exports what it read into
+   `03b-figma/v<N>/` — extracted per-screen specs, reference renders, tokens, and a Figma-to-code
+   component mapping. Every other agent reads those files. Nobody else needs Figma access, and no
+   phase blocks on Figma being reachable.
+2. **Implement against a `published` version, never a `draft` and never the live file.** Versions
+   are immutable once published; a change is `v<N+1>`. `state.json` -> `design_version` names the
+   current one, or `null`.
+3. **Authority splits by kind of question.** Visual properties — layout, spacing, type scale,
+   color, radius, elevation, component composition — follow the published design version when one
+   exists. Behavioral properties — which states exist, validation, copy strings, focus order,
+   accessibility semantics, analytics — follow `03-design/*.md`, always, because that is what the
+   UX audit ran against. With no published version, `03-design/*.md` governs everything.
+
+Where the two disagree inside one column, that is a `major` defect: follow `03-design/*.md`, open an
+issue naming both files and both values, and bus `sdlc-ux-designer`. Never split the difference.
+
+**A newly published design version makes later sign-offs stale**, exactly as a code change does
+(section 7): a `review`, `qa`, or `ui-qa` pass recorded before the publish no longer covers the
+current design, and those gates re-run in the current cycle. Gate key `figma-design`; `skipped` with
+a recorded reason when there is no Figma, no access, or no user-facing surface.
 
 ## 3. History — append-only, never rewritten
 
@@ -94,8 +128,8 @@ One JSON line per meaningful event in `history/events.jsonl`:
 Events: `phase_start`, `run_complete`, `question_asked`, `question_answered`, `issue_opened`,
 `issue_triaged`, `investigation_started`, `investigation_complete`, `root_cause_found`,
 `issue_fixed`, `issue_verified`, `issue_reopened`, `adr_recorded`, `test_plan_approved`,
-`test_plan_amended`, `gate_passed`, `gate_failed`, `cycle_opened`, `cycle_closed`, `escalated`,
-`shipped`.
+`test_plan_amended`, `figma_version_published`, `figma_drift_detected`, `figma_conflict_opened`,
+`gate_passed`, `gate_failed`, `cycle_opened`, `cycle_closed`, `escalated`, `shipped`.
 
 **Timing rides on the same bracket, for free.** You already write `phase_start` before working and
 `run_complete` after — this is the only extra step:
@@ -267,12 +301,15 @@ verdict: passed | failed
 reviewed_by: <agent>
 cycle: <n>
 commit_or_files: <sha or file list>
+design_version: <v<N> this covers, or none>
 ran: <commands and real results>
 verified: <what you established>
 NOT verified: <what you could not check, and why — be specific>
 ```
 
-`NOT verified` is what makes a sign-off honest; one with no stated limits claims omniscience. A
+`design_version` is the published Figma design version the sign-off covers, or `none` — it is what
+lets the release gate tell a fresh pass from one that predates a design change, since these blocks
+carry no timestamp. `NOT verified` is what makes a sign-off honest; one with no stated limits claims omniscience. A
 sign-off is scoped to its own gate. **Only `sdlc-release-gate` declares ship-readiness**, by
 auditing the others — rejecting any made stale by later changes, and any covering work its author
 changed beyond mechanical fixes. Never state or imply ship-readiness outside your scope.
@@ -301,6 +338,8 @@ it — "probably fine" is a fail:
    never fully run.
 9. No sign-off was made stale by a later code change, and nobody signed off on work they authored
    beyond mechanical fixes.
+10. If `design_version` is set, no `review`, `qa`, or `ui-qa` pass predates the publish of that
+   version, and the implementation was built against it rather than a superseded one.
 
 **Escalation instead of spinning.** If `cycle > max_cycles`, or the same issue has reopened in three
 cycles, or a contradiction exists that only a human can resolve — conflicting requirements, an

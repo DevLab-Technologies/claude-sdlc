@@ -42,10 +42,12 @@ independent ever checks. This pipeline is mostly a set of constraints against th
 |---|---|
 | `/sdlc <request>` | The full pipeline, cycling until every gate passes or it escalates |
 | `/sdlc-product <request \| PRD \| stories>` | Specification work only — four parallel lenses, then a consolidated spec, a quoted before/after changelog, and a prioritized list of what still needs improving. Stops before design and engineering |
+| `/sdlc-figma-design <slug \| path> [generate \| import \| sync \| link]` | Turn the requirements into a versioned Figma design — author the frames, or import a file the team already had — then export it into the workspace so implementers and QA can build and check against it without Figma access |
 | `/sdlc-review [target]` | The whole review phase alone — a feature, branch, PR number, path, or the working diff |
 | `/sdlc-bug <report>` | The root-cause path, with every verification gate intact |
 | `/sdlc-digest [slug \| path]` | The long artifacts as short briefs a human can read in minutes — feature, stories, design, tests, status, release, and a one-pager |
 | `/sdlc-status [slug]` | Position, gates, issues, investigations, and the next action |
+| `/sdlc-visualize [slug]` | Render a real feature's history as the Pipeline Floor replay — real agents, real durations, real gate outcomes |
 | `/sdlc-timing [slug]` | How long things took — per feature, per cycle, per agent, per individual run, with wall-clock separated from summed agent-time |
 | `/sdlc-resume [slug]` | Diagnose an interrupted run, quarantine partial output, re-run only what died |
 | `/sdlc-init` | Set up a project and learn its build, lint, and test commands |
@@ -136,6 +138,30 @@ for places that claimed to parallelize but didn't:
 Naive parallelism here corrupts state, so the protocol names four hazards and a rule for each: parallel
 agents never allocate global ids (a synthesizer does it afterward), only one agent edits per phase, and
 only the phase owner touches `state.json`.
+
+### Figma, when there is Figma
+
+Design lives in two places for most teams: frames someone drew, and the written specification that
+says what happens when the network drops. The pipeline holds both without letting them fight.
+
+`/sdlc-figma-design` publishes a **versioned design** into `03b-figma/v<N>/` — a per-screen spec with
+measured values, a reference render per state, tokens as values, a map from Figma components to the
+real code components, a coverage list, and a reconciliation against the markdown specification. It
+generates the frames from the specification, or imports the file a team designed in months ago, or
+syncs after a designer moves things.
+
+The export is the point. Exactly one agent ever calls Figma; implementers and UI QA read files.
+Nobody else needs a Figma credential, and no phase stalls because Figma is unreachable — a project
+with no Figma at all runs the pipeline unchanged on the markdown specification, and that is recorded
+as an answer rather than left blank so nobody is asked twice.
+
+Two rules make the second artifact safe. Versions are immutable once published and a change is
+`v<N+1>`, so publishing a new one stales every `review`, `qa`, and `ui-qa` pass recorded before it —
+the same treatment a code change gets. And authority splits by the kind of question: visual
+properties follow the published version, while which states exist, validation, copy, focus order, and
+accessibility semantics follow the markdown, always, because that is what the UX audit ran against. A
+disagreement inside one column is a `major` defect routed to the designer, never a choice an
+implementer makes on the spot.
 
 ### Artifacts agents can act on, briefs people can read
 
