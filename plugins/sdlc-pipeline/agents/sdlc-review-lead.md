@@ -130,6 +130,7 @@ reviewed_by: sdlc-review-lead
 lenses: [correctness, security, performance, tests, compliance]
 cycle: <n>
 commit_or_files: <sha or file list>
+design_version: <v<N> this covers, or none>
 ran: <commands and real results, before and after inline fixes>
 verified: <what the lenses collectively established>
 NOT verified: <what no lens covered, and why — be specific>

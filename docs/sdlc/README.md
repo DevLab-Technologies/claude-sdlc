@@ -11,12 +11,16 @@ flowchart TD
     RES --> PO[product owner<br/>PRD + stories + backlog]
     PO --> UX[ux designer<br/>flows + screens + tokens]
     UX --> AUD[ux auditor<br/>independent audit]
+    AUD --> FIG[figma designer<br/>publish design version v N<br/>generate · import · sync]
+    FIG -.->|behavioral conflicts| UX
     AUD -->|blockers| UX
     AUD --> ARCH[architect<br/>architecture + interfaces + ADRs + workplan]
     ARCH --> TP[QA authors test plan<br/>cases before code exists]
     TP --> TPR[architect + product owner<br/>adversarial edge-case review]
     TPR -->|gaps| TP
     TPR --> IMPL[implementers<br/>one per task, writing their assigned TC cases]
+    FIG -.->|published version| IMPL
+    FIG -.->|reference renders| UIQA
     IMPL --> RV[review lead: verify once<br/>build + suite + smoke + claim check]
     RV --> REV[5 lenses in parallel<br/>correctness · security · performance<br/>tests · compliance]
     REV --> RS[review lead: synthesize<br/>merge, dedupe, allocate ids, sign off]
@@ -51,6 +55,7 @@ flowchart TD
 | `sdlc-business-analyst` | Problem evidence, value hypothesis, honest metrics, cost and alternatives | Manufacture confidence or doubt |
 | `sdlc-ux-designer` | Flows, screen specs, all states, copy, tokens | Change requirements silently |
 | `sdlc-ux-auditor` | Independent usability and a11y audit | Defer to the designer |
+| `sdlc-figma-designer` | The Figma boundary both ways, versioned design releases, the export every other agent reads | Invent a measurement, or introduce a requirement through a frame |
 | `sdlc-architect` | Architecture, interface contracts, ADRs, workplan, test-plan technical review | Write feature code |
 | `sdlc-implementer` | Code and tests for one task, or one fix set | Redefine scope or contract |
 | `sdlc-debugger` | Reproduction, isolation, **proven** root cause, blast radius | Implement the fix |
@@ -117,6 +122,36 @@ a test narrowed to fit the implementation is a blocker.
 This ordering is the difference between finding edge cases as rework and building them in. What
 QA discovers during execution is amended back into the plan, so coverage accumulates instead of
 being rediscovered each cycle.
+
+## Figma sits beside the specification, not instead of it
+
+A team with Figma files and a pipeline whose only bus is the filesystem has two design artifacts.
+Three rules keep that from being a liability.
+
+**One agent crosses the boundary.** `sdlc-figma-designer` is the only agent that ever calls Figma.
+It generates frames from the specification, imports frames that already existed, or syncs after the
+file moved — then exports everything it read into `03b-figma/v<N>/`: a per-screen spec with measured
+values, a reference render per state, tokens as values, and a map from Figma components to real code
+components. Implementers and UI QA read those files. Nobody else needs Figma access, no credential
+spreads, and no phase stalls because Figma is unreachable.
+
+**Designs are versioned and published, like cross-repo contracts.** Work is implemented against a
+`published` version, never a live file and never a `draft`. Published versions are immutable; a
+change is `v<N+1>`. And publishing a new version stales every `review`, `qa`, and `ui-qa` pass
+recorded before it — the same rule that makes a code change stale a sign-off, applied to the thing
+those gates were checking against.
+
+**Authority splits by the kind of question, not by which file is newer.** Visual properties —
+layout, spacing, type scale, color, radius, elevation, composition — follow the published design
+version. Which states exist, validation rules, copy strings, focus order, and accessibility
+semantics follow `03-design/*.md`, always, because a frame does not enumerate an offline state,
+cannot express focus return, and was never audited. With no Figma at all, markdown governs
+everything and nothing about the pipeline changes.
+
+Where the two disagree inside one column, that is a `major` defect and not a choice: follow the
+markdown, open an issue naming both files and both values, and route it to the designer. An
+implementer picking the easier of two conflicting sources is how a feature ships against a design
+nobody approved.
 
 ## Review is five lenses in parallel, bracketed by a lead
 
@@ -193,6 +228,9 @@ since it is the parallelism actually paying off.
 - `.sdlc/features/<slug>/history/runs/` — every agent run's full outcome
 - `.sdlc/features/<slug>/bus/` — directed questions between agents, each with a default
 - `.sdlc/features/<slug>/issues/` — every finding, one file each
+- `.sdlc/features/<slug>/03b-figma/v<N>/` — one published design version: extracted per-screen
+  specs, reference renders, tokens, the Figma-to-code component map, coverage, reconciliation
+- `.sdlc/figma.json` — whether this project has Figma files at all, their URLs, and the access path
 - `.sdlc/features/<slug>/06-test-plan/plan.md` — the binding test contract
 - `.sdlc/features/<slug>/11-investigations/` — root-cause investigations
 - `.sdlc/features/<slug>/floor/pipeline-floor.html` — the real replay from `/sdlc-visualize`, ending

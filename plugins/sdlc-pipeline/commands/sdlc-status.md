@@ -10,7 +10,7 @@ For each feature, read `state.json`, `history/events.jsonl`, `issues/*.md`,
 
 ## <title> (`<slug>`)
 - **Position** — phase, cycle `n` of `max_cycles`, `track`, status
-- **Gates** — a single line: `intake ok | research ok | product ok | design ok | ux-audit ok | architecture ok | implementation ok | review FAILED | qa - | ui-qa - | release -`
+- **Gates** — a single line: `intake ok | research ok | product ok | design ok | figma-design skip | ux-audit ok | architecture ok | implementation ok | review FAILED | qa - | ui-qa - | release -`
 - **Issues** — counts by severity and status; list every open blocker and major with its id,
   title, owner role, and whether it has a proven root cause
 - **Investigations** — open investigations and their status; flag any issue with
@@ -18,6 +18,11 @@ For each feature, read `state.json`, `history/events.jsonl`, `issues/*.md`,
 - **Test plan** — status (`draft`/`in_review`/`approved`/`amended`) and case counts by state. Flag
   any case still `planned` or `implemented` at QA time, and any `implemented` case whose `test_file`
   is empty — that is a claimed test with nothing behind it
+- **Design source** — one line: the published Figma design version and when it published, or
+  `markdown spec only`. Flag three things, because each is silent otherwise: a `review`, `qa`, or
+  `ui-qa` pass older than the current version's publish; an implementer task record naming a
+  superseded version; and any unresolved conflict in `03b-figma/v<N>/reconciliation.md`. Omit the
+  line entirely when `.sdlc/figma.json` says `available: false`
 - **Waiting on** — unanswered blocking bus messages and unanswered human questions, quoted
 - **Recent activity** — the last five events from the log, one line each
 - **Next action** — the exact agent to run next, and why

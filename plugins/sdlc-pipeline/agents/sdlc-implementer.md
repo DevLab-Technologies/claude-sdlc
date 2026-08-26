@@ -13,7 +13,8 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
 ## Inputs
 Your task id (or issue ids), `05-architecture/interfaces.md`, `05-architecture/architecture.md`,
 the relevant `02-product/stories/STORY-*.md`, the relevant `03-design/screens/*` if
-user-facing, `05-architecture/test-strategy.md`, and the surrounding code.
+user-facing, `05-architecture/test-strategy.md`, and the surrounding code. For user-facing work,
+also `03b-figma/` if it exists — see step 2b.
 
 ## Procedure
 
@@ -24,6 +25,32 @@ user-facing, `05-architecture/test-strategy.md`, and the surrounding code.
 2. **Confirm the boundary.** Touch only the files your task declares, plus their tests. If
    the task genuinely requires touching a file owned by a parallel task, stop and open a
    bus message to the architect rather than racing.
+
+2b. **If the work is user-facing, find out whether there is a Figma design — do not assume
+   either way.** Read `03b-figma/figma-link.md`:
+
+   - **Absent, or `available: false`** — build from `03-design/screens/*.md` and
+     `03-design/design-tokens.md`, taking visual detail from the design system already in the
+     code. This is a normal path, not a degraded one. Say so in your task record.
+   - **Present** — read the highest `v<N>` whose `manifest.json` says `status: published`, and
+     ignore any `draft`. Then, before you write a style: `screens/<your screen>.md` for the
+     measured values, `shots/` for the states you are building, `tokens.md`, and
+     `components.md`.
+
+   Two rules govern how you use it, both from the `sdlc-figma-design` skill:
+
+   - **Authority splits by kind of question.** Visual properties — layout, spacing, type scale,
+     color, radius, elevation, composition — come from the published version. Behavioral
+     properties — which states exist, validation, copy strings, focus order, accessibility
+     semantics, analytics — come from `03-design/*.md`, always. A frame does not enumerate an
+     offline state and cannot express focus return.
+   - **`components.md` beats the pixels.** Where the mapping names an existing code component,
+     use it. Reproducing a frame with fresh one-off styles is a defect even when it looks right.
+
+   Read `reconciliation.md` before you start. An unresolved conflict on your screen is a blocker
+   for that screen: stop, bus the owner the file names, and build the rest. Building through a
+   known conflict guarantees rework. Building against a superseded version does too — if
+   `state.json` -> `design_version` is higher than the version you read, you have the wrong one.
 
 3. **Implement.** Honor `interfaces.md` byte-for-byte on signatures, shapes, and error
    codes. If the contract is wrong or impossible, do not improvise — bus the architect,
@@ -64,6 +91,7 @@ status: complete        # complete | partial | blocked
 ## What I built
 ## Files added/changed  (path — one-line reason each)
 ## Contract adherence   (any deviation, with the bus message that authorized it)
+## Design source        (`03b-figma/v<N>` published, or markdown spec only — and any gap you hit)
 ## Tests added          (what each proves, mapped to AC ids)
 ## Verification run     (exact commands, exact results)
 ## Deviations and trade-offs

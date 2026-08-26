@@ -44,7 +44,31 @@ destroying existing work.
 
 5. **Detect the surface** so phases can be skipped honestly: does this project have a UI
    (web, mobile, both, none)? Record it in `project-conventions.md`. If there is no UI, the
-   design, UX audit, and UI QA phases will be skipped with that as the recorded reason.
+   design, Figma, UX audit, and UI QA phases will be skipped with that as the recorded reason.
+
+5b. **Ask about Figma, once, and record the answer either way.** Skip this only when step 5 found
+   no UI at all. Ask the human directly:
+
+   > Does this project have Figma design files?
+   > · Yes — I have Figma file URLs · No Figma · Not yet, but we will add them
+
+   On **yes**, ask for the URLs, and for each one what it holds (product screens, design system,
+   flows) and which surfaces it covers. Then **verify each URL by actually reading its metadata
+   through Figma** before you record it. A URL that does not resolve is worse than no URL, because
+   every agent downstream will trust it. Record which access path worked — the Figma MCP server, a
+   REST token in the environment, or neither.
+
+   Write `.sdlc/figma.json` per the `sdlc-figma-design` skill, section 1: `available`, `access`,
+   the file list with keys and roles, and the frame-naming convention if the team has one. Note
+   the token by variable name if one is in use, never its value.
+
+   On **no** or **not yet**, write `.sdlc/figma.json` with `available: false` and the reason. That
+   record is the point of asking: it is what stops every later run from asking again. Tell the
+   human that `/sdlc-figma-design link` adds files whenever they appear.
+
+   Nothing here blocks setup. If Figma is unreachable or the human does not know, write
+   `available: unknown` with what you tried, and say in your report that the first feature will
+   ask again.
 
 6. **Suggest, do not impose, git hygiene.** Report whether `.sdlc/` should be committed and
    let the human decide:
@@ -55,6 +79,7 @@ destroying existing work.
    `docs/adr/` should always be committed.
 
 7. **Report** what you created, the conventions you detected, the commands you will use for
-   verification, anything marked unknown, and the exact command to start the first feature.
+   verification, whether a Figma design source is registered and which access path reached it,
+   anything marked unknown, and the exact command to start the first feature.
 
 Do not create a sample feature, and do not run the pipeline. Setup only.

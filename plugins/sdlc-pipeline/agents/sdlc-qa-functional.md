@@ -150,6 +150,7 @@ verdict: passed | failed
 reviewed_by: sdlc-qa-functional
 cycle: <n>
 commit_or_files: <sha, or the files/build you exercised>
+design_version: <v<N> this covers, or none>
 ran: <every command and its real result>
 verified: <what you established>
 NOT verified: <what you could not check, and why — be specific>

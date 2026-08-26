@@ -52,6 +52,17 @@ First, invoke the `sdlc-protocol` skill and follow it exactly — it is the bind
    `## Fixed inline` sections: anything there touching logic, security, or a test assertion is a
    protocol violation and a `blocker`, regardless of whether the code now works.
 
+4b. **Design version freshness.** If `state.json` -> `design_version` is set, read the
+   `design_version` line on the `review`, `qa`, and `ui-qa` sign-offs and compare each against it.
+   Anything lower covers a superseded design and fails, exactly as a code change would stale a
+   sign-off (protocol 2a). Compare version numbers, not times: these blocks carry no timestamp, and
+   a file's mtime survives neither a checkout nor a rebase, so a time-based check here is a guess
+   dressed as evidence. A sign-off with no `design_version` line at all is unauditable on this
+   point and fails the same way. Also check the implementers' `## Design source` lines name the
+   published version rather than a superseded one, and that `reconciliation.md` holds no unresolved
+   conflict. A `skipped` figma-design gate is fine when the reason is recorded — no
+   Figma, no access, or no user-facing surface — but "we ran out of time" is not one of those.
+
 5. **Issue ledger.** Confirm no open or fixing blocker/major issues, and that every
    `deferred` or `wontfix` carries a rationale. List every deferred item in the release
    record — deferred work that nobody sees is just hidden work.
