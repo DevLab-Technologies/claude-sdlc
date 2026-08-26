@@ -42,8 +42,12 @@ built on unresolved blocking questions is a PRD that will be rewritten.
 For an existing PRD or stories, skip this. Do not re-scope work someone already scoped; review it
 instead and let the critics find what the scoping missed.
 
-Optionally launch `sdlc-researcher` alongside intake when the request touches an unfamiliar domain,
-a competitive space, or a regulated area. Skip it for a small change to an understood surface.
+Optionally launch the three research lenses — `sdlc-researcher-findings`,
+`sdlc-researcher-prior-art`, `sdlc-researcher-constraints` — **in one message alongside intake**
+when the request touches an unfamiliar domain, a competitive space, or a regulated area. They need
+only `scope.md`/`assumptions.md`, which intake writes in its single pass regardless of any blocking
+question, so there is no reason to wait for intake's gate to close first. Skip them for a small
+change to an understood surface.
 
 ## Step 2 — Author or load the specification
 

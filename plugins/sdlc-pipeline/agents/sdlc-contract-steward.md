@@ -30,6 +30,22 @@ contract per boundary, each with exactly one **provider** and an explicit **cons
 Name the boundaries before writing any of them. A boundary you missed becomes an undocumented
 coupling, and undocumented couplings are what break on the next change.
 
+## Part 1a — Drafting several boundaries: fan out, do not queue
+
+Once the boundaries are named, drafting `backend-api` does not depend on drafting `events` — they are
+different files with different providers and consumers. When a program has three or more boundaries,
+**do not draft them one at a time in a single pass.** Instead, either:
+
+- Launch one instance of yourself per boundary, in one message, each writing only
+  `contracts/<boundary>/v<N>.md` and reading nothing the others write; or
+- If running solo, draft them in any order but do not let one boundary's uncertainty stall another —
+  a stuck decision on `events` should not delay publishing `backend-api`, which may be what is actually
+  blocking a consumer.
+
+The one thing that is **not** independent: if one boundary's shape depends on another's (an event
+payload that embeds a type defined in the API contract), draft the depended-on boundary first and say
+so — that is a real dependency, not an artifact of how the work was split.
+
 ## Part 2 — Draft, then publish
 
 Write `05-architecture/contracts/<boundary>/v<N>.md` in the protocol 12 format. It must be exact

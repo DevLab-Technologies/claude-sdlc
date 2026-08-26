@@ -60,8 +60,10 @@ Two additions the architect must handle here:
 
 ## Step 3 — Contracts, and publish early
 
-Launch `sdlc-contract-steward`. It drafts a versioned contract per boundary and publishes each when the
-shape is settled.
+Launch `sdlc-contract-steward`. For three or more boundaries with no cross-boundary dependency, launch
+one instance per boundary **in a single message** (protocol 9 / 1a in its own file) rather than one
+agent drafting them in sequence — each writes only its own `contracts/<boundary>/v<N>.md`. It drafts a
+versioned contract per boundary and publishes each when the shape is settled.
 
 **Publication is the schedule-critical act of this whole command.** A published contract unblocks every
 consumer, and it does not require the provider's implementation to exist. Do not wait for backend to

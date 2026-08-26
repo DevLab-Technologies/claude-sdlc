@@ -109,12 +109,28 @@ failures become issues, issues get triaged by cause, and the loop repeats until 
 together or `max_cycles` is hit, at which point it writes an escalation with options instead of
 spinning.
 
-Work runs in parallel where it is genuinely independent — research sweeps, the two test-plan
-reviewers, implementers on file-disjoint tasks, one debugger per symptom cluster, and five review
-lenses at once. Naive parallelism here corrupts state, so the protocol names four hazards and a
-rule for each: parallel agents never allocate global ids (a synthesizer does it afterward), only
-one agent edits per phase, the build and suite run **once** before the fan-out into a file the
-group reads, and only the phase owner touches `state.json`.
+Work runs in parallel wherever it is genuinely independent, and the pipeline is checked periodically
+for places that claimed to parallelize but didn't:
+
+- **Research runs as three concurrent lenses** — internal code, external prior art, and hard
+  constraints — each owning its own file. It used to be one agent doing all three in sequence despite
+  the docs claiming a fan-out; that gap is closed.
+- **Research does not wait on the human.** Intake writes `scope.md` and `assumptions.md` in its single
+  pass, before it even checks whether a blocking question remains open. Research needs only those two
+  files, never the human's answer, so it launches the moment intake finishes — concurrently with the
+  person still reading the blocking questions. Only the product phase actually waits.
+- **Contract drafting fans out per boundary** in a multi-repo program, instead of one steward pass
+  drafting `backend-api`, then `events`, then `webhooks` in sequence — unless one boundary's shape
+  genuinely depends on another's.
+- **Five review lenses at once**, bracketed by a lead that runs the build and suite **once** so five
+  agents do not collide on ports and fixtures — split further into a fast stage (build, type check)
+  that gates the fan-out and a slow stage (the suite) that runs *alongside* the four lenses that never
+  read runtime results.
+- One debugger per symptom cluster, implementers on file-disjoint tasks, the two test-plan reviewers.
+
+Naive parallelism here corrupts state, so the protocol names four hazards and a rule for each: parallel
+agents never allocate global ids (a synthesizer does it afterward), only one agent edits per phase, and
+only the phase owner touches `state.json`.
 
 ### Artifacts agents can act on, briefs people can read
 

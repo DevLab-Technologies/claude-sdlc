@@ -22,6 +22,22 @@ enforce the gates, and keep the workspace honest.
    verbatim to `brief.md`, initialize `state.json` (`cycle: 1`, all gates `pending`), and
    register the feature in `.sdlc/registry.json`.
 
+## Phase 0 and 1 overlap — research does not wait on a human
+
+Intake writes `scope.md` and `assumptions.md` in its single pass, **before** it checks whether any
+blocking question remains unanswered. The three research lenses declare only those two files as
+input, never `answers.md` — so they have no real dependency on a human resolving a blocking question,
+only on intake having run once.
+
+**So: launch the three research lenses the moment intake's single pass completes**, in the same
+message as you present any blocking questions to the human. Waiting on a person to answer and waiting
+on an automated agent to research are orthogonal; there is no reason to serialize them. The product
+owner still waits for `intake: passed` — a real dependency, since it needs the resolved scope — but
+research does not.
+
+If intake escalates with no blocking questions, this is moot: proceed to research immediately as
+before.
+
 ## Pick the track before running anything
 
 Read protocol section 8 and choose `trivial` | `small` | `standard` | `large`, then record it in
@@ -53,7 +69,7 @@ trust the artifacts, not the agent's summary — and only then proceed.
 | # | Agent | Gate |
 |---|---|---|
 | 0 | `sdlc-intake` | intake |
-| 1 | `sdlc-researcher` | research |
+| 1 | `sdlc-researcher-findings` + `sdlc-researcher-prior-art` + `sdlc-researcher-constraints`, concurrently | research |
 | 2 | `sdlc-product-owner` | product |
 | 3 | `sdlc-ux-designer` (skip if no user-facing surface — record why) | design |
 | 4 | `sdlc-ux-auditor` | ux-audit |
@@ -78,13 +94,17 @@ Rules for the sequence:
 - **Phase 7 implementers must be handed their `TC` ids**, from `06-test-plan/assignments.md`.
   An implementer launched without its assigned cases will invent its own tests, which is the
   failure mode this phase exists to prevent.
-- **Intake blocking questions stop everything.** Present them to the human verbatim and
-  wait. This is the one place the pipeline is allowed to block on a person.
+- **Intake blocking questions stop the product phase, not the pipeline.** Present them to the human
+  verbatim and wait — but only phase 2 onward actually waits, since research does not need the
+  answers (see the overlap note above). This is the one place the pipeline blocks on a person, and
+  even here it blocks the minimum, not everything after it.
 - **Parallelize wherever protocol section 9 permits, and nowhere else.** Read that section before
   launching any group; it names the four hazards (id races, concurrent edits, shared runtime
   resources, shared state) and the rule that neutralizes each. Every parallel group gets launched
   in **one message** — separate messages run in sequence and you lose the entire benefit.
-  - Phase 1: the research sweeps (internal code, external prior art, constraints) can fan out.
+  - Phase 1: the three research lenses (`sdlc-researcher-findings`, `sdlc-researcher-prior-art`,
+    `sdlc-researcher-constraints`) launch together, in one message, immediately after intake's single
+    pass — see the overlap note above. Each owns one file and needs no output from the others.
   - Phase 6: the architect and product owner review the plan concurrently.
   - Phase 7: implementers for tasks the workplan declares `parallel_with`; run conflicting tasks
     in sequence.

@@ -7,7 +7,7 @@ flowchart TD
     REQ[Feature request] --> IN[intake<br/>scope + questions + assumptions]
     IN -->|blocking questions| HUMAN[Human answers]
     HUMAN --> IN
-    IN --> RES[researcher<br/>findings + constraints]
+    IN -.->|scope.md written, no wait| RES{3 research lenses<br/>findings · prior-art · constraints}
     RES --> PO[product owner<br/>PRD + stories + backlog]
     PO --> UX[ux designer<br/>flows + screens + tokens]
     UX --> AUD[ux auditor<br/>independent audit]
@@ -43,7 +43,9 @@ flowchart TD
 | Agent | Owns | Never does |
 |---|---|---|
 | `sdlc-intake` | Scope, questions, assumptions | Design or estimate |
-| `sdlc-researcher` | Findings, prior art, hard constraints | Decide scope |
+| `sdlc-researcher-findings` | Existing code, reuse, conflicts | Decide scope, touch the network |
+| `sdlc-researcher-prior-art` | How comparable products solve this problem | Decide scope |
+| `sdlc-researcher-constraints` | Hard technical, legal, and convention limits | Present a preference as a wall |
 | `sdlc-product-owner` | PRD, stories, acceptance criteria, priority, test-plan coverage review | Say how to build it |
 | `sdlc-product-critic` | Uncovered user scenarios, falsifiable criteria, story quality | Rewrite the spec it critiques |
 | `sdlc-business-analyst` | Problem evidence, value hypothesis, honest metrics, cost and alternatives | Manufacture confidence or doubt |
