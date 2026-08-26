@@ -49,6 +49,26 @@ numbers, never one standing in for the other:
 
 For a group with one agent, the two numbers are the same — report one.
 
+## Step 2a — Format every duration for humans, not machines
+
+`duration_ms` is the stored, sortable, summable source of truth — keep computing with it. But never
+print a raw millisecond figure in the report. Convert every duration you display with this rule,
+applied to the single value being shown (a sum, a wall-clock gap, an average — each formatted on its
+own terms, not the raw feature-total scale applied to a five-second job):
+
+| Magnitude | Format | Example |
+|---|---|---|
+| < 1 second | milliseconds | `840ms` |
+| < 1 minute | seconds, rounded | `47s` |
+| < 1 hour | minutes, plus seconds if any | `6m`, `6m 12s` |
+| < 1 day | hours, plus minutes if any | `2h`, `2h 15m` |
+| ≥ 1 day | days, plus hours if any | `1d`, `1d 6h` |
+
+At most two units, largest first, and drop the second unit when it is zero — `1h`, not `1h 0m`. This
+is a display rule only: sort tables, compute sums and averages, and compare against `max_cycles` or
+anything else using the raw `duration_ms`, and format only at the moment a number is written into the
+report.
+
 ## Step 3 — Build the four views
 
 **Per feature.** One line: track, cycle count, and total wall-clock. If `shipped` exists, use its

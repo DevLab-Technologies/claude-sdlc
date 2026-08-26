@@ -22,8 +22,10 @@ For each feature, read `state.json`, `history/events.jsonl`, `issues/*.md`,
 - **Recent activity** — the last five events from the log, one line each
 - **Next action** — the exact agent to run next, and why
 - **Elapsed** — one line: total wall-clock so far and current-cycle wall-clock, from the same
-  `duration_ms` fields `/sdlc-timing` reports in full. Point at that command for the per-agent and
-  per-job breakdown rather than reproducing it here.
+  `duration_ms` fields `/sdlc-timing` reports in full. Format both using that command's duration
+  table (days/hours/minutes/seconds, milliseconds only under one second) — never print a raw
+  millisecond figure. Point at `/sdlc-timing` for the per-agent and per-job breakdown rather than
+  reproducing it here.
 - **Interrupted runs** — any unpaired `phase_start`, or artifact lacking `status: complete`, ignoring
   `digest/` since those briefs are derived and regenerated, not recovered. Say plainly that
   `/sdlc-resume` is needed rather than reporting the position as if the run finished
