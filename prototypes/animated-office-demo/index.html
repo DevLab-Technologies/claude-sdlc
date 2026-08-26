@@ -160,8 +160,10 @@
     image-rendering: pixelated;
     image-rendering: -moz-crisp-edges;
     width: 100%;
-    height: 100%;
+    height: auto;
+    aspect-ratio: 8 / 5;
     max-width: 1040px;
+    max-height: 100%;
     background: var(--floor);
     border: 1px solid var(--panel-line);
     border-radius: 2px;
@@ -381,7 +383,7 @@
 
 <main>
   <div class="floor-wrap">
-    <canvas id="floor" width="480" height="300"></canvas>
+    <canvas id="floor" width="960" height="600"></canvas>
     <div class="floor-caption" id="floorCaption">warming up the floor&hellip;</div>
   </div>
 
@@ -472,10 +474,15 @@
     ]}
   ];
 
-  var TILE = 26;                 // grid cell size in canvas px (internal resolution)
-  var ORIGIN_X = 26, ORIGIN_Y = 30;
+  var TILE = 52;                 // grid cell size in canvas px (internal resolution)
+  var ORIGIN_X = 52, ORIGIN_Y = 60;
 
-  var DESKS = {};                // id -> {x,y,short,dept,state,ticks}
+  // Every desk carries two things that must not be conflated:
+  //   state      — what is happening THIS instant (only meaningful while activeNow)
+  //   completed / hasOpenIssue — sticky facts that persist once true, so a desk that
+  //   finished its work keeps reading as "finished" instead of reverting to "never
+  //   touched" the moment the script moves on. That collapse was the original bug.
+  var DESKS = {};                // id -> {x,y,short,dept,state,activeNow,completed,hasOpenIssue}
   var DEPT_LABELS = [];
 
   DEPARTMENTS.forEach(function (dept) {
@@ -484,10 +491,10 @@
       var dx = i % perRow, dy = Math.floor(i / perRow);
       var x = ORIGIN_X + (dept.col + dx * 1.15) * TILE;
       var y = ORIGIN_Y + (dept.row + dy * 1.3) * TILE;
-      DESKS[d.id] = { x: x, y: y, short: d.short, dept: dept.id, state: "idle", phase: 0 };
+      DESKS[d.id] = { x: x, y: y, short: d.short, dept: dept.id,
+        state: "idle", activeNow: false, completed: false, hasOpenIssue: false };
     });
-    var firstDesk = DESKS[dept.desks[0].id];
-    DEPT_LABELS.push({ x: ORIGIN_X + dept.col * TILE, y: ORIGIN_Y + dept.row * TILE - 10, text: dept.label });
+    DEPT_LABELS.push({ x: ORIGIN_X + dept.col * TILE, y: ORIGIN_Y + dept.row * TILE - 20, text: dept.label });
   });
 
   var ROLE_TINT = {
@@ -667,7 +674,10 @@
   var raf = null;
 
   function resetAll() {
-    Object.keys(DESKS).forEach(function (id) { DESKS[id].state = "idle"; });
+    Object.keys(DESKS).forEach(function (id) {
+      var d = DESKS[id];
+      d.state = "idle"; d.activeNow = false; d.completed = false; d.hasOpenIssue = false;
+    });
     gateRailEl.querySelectorAll(".gate-pill").forEach(function (p) { p.className = "gate-pill"; });
     tickerEl.innerHTML = "";
     counts = { blocker: 0, major: 0, verified: 0 };
@@ -700,11 +710,17 @@
   }
 
   function applyStep(s) {
-    Object.keys(DESKS).forEach(function (id) {
-      if (DESKS[id].state !== "idle") DESKS[id].state = "off";
-    });
+    // Only the desks in THIS step are "active now" — everyone else keeps whatever
+    // sticky state they already earned (completed / hasOpenIssue), which is what
+    // lets finished work stay visibly lit as the floor fills up.
+    Object.keys(DESKS).forEach(function (id) { DESKS[id].activeNow = false; });
     s.desks.forEach(function (id) {
-      if (DESKS[id]) DESKS[id].state = s.state;
+      var d = DESKS[id];
+      if (!d) return;
+      d.activeNow = true;
+      d.state = s.state;
+      if (s.state === "done") { d.completed = true; d.hasOpenIssue = false; }
+      if (s.state === "bad") { d.hasOpenIssue = true; }
     });
     if (s.gate) {
       setGate(s.gate, s.state === "bad" ? "bad" : "done");
@@ -771,8 +787,8 @@
       ctx.beginPath(); ctx.moveTo(0, gy + 0.5); ctx.lineTo(canvas.width, gy + 0.5); ctx.stroke();
     }
 
-    ctx.font = "6px 'Silkscreen', monospace";
-    ctx.fillStyle = "#4c5a6e";
+    ctx.font = "12px 'Silkscreen', monospace";
+    ctx.fillStyle = "#6b7c94";
     DEPT_LABELS.forEach(function (d) {
       ctx.fillText(d.text, d.x, d.y);
     });
@@ -782,57 +798,75 @@
     });
   }
 
+  // Resolve the four things a desk can look like. "activeNow" (currently in the
+  // running step) always wins and gets the bright, animated treatment; otherwise
+  // a desk shows the sticky record of what happened to it: resting (finished),
+  // issue (finished with an unresolved problem), or idle (never started yet).
+  function visualState(desk) {
+    if (desk.activeNow) return desk.state;         // working | done | bad, this instant
+    if (desk.hasOpenIssue) return "issue";
+    if (desk.completed) return "resting";
+    return "idle";
+  }
+
+  var GLOW = { idle: "#3a4658", resting: "#2f5a48", issue: "#5a3030",
+    working: "#ffb545", done: "#5fd3a0", bad: "#ff6b6b" };
+  var PERSON_TINT = { idle: "#414f66", resting: "#4f8a70", issue: "#a45a5a" };
+  var HEAD_IDLE = "#3a4658", HEAD_LIT = "#e6b98c";
+
   function drawDesk(desk, now, id) {
     var x = desk.x, y = desk.y;
-    var w = 20, h = 12;
+    var vis = visualState(desk);
+    var w = 40, h = 24;
 
     // desk surface
     ctx.fillStyle = "#2b3a4d";
-    ctx.fillRect(x, y + 10, w, h);
+    ctx.fillRect(x, y + 20, w, h);
     ctx.fillStyle = "#364a63";
-    ctx.fillRect(x, y + 10, w, 3);
+    ctx.fillRect(x, y + 20, w, 6);
 
-    // monitor glow colored by state
-    var glow = { idle: "#3a4658", off: "#293544", working: "#ffb545", done: "#5fd3a0", bad: "#ff6b6b" }[desk.state] || "#3a4658";
-    ctx.fillStyle = glow;
-    ctx.fillRect(x + 3, y + 3, 14, 7);
-    if (desk.state === "working" || desk.state === "bad") {
+    // monitor glow — bright while actively resolving, dim-but-colored once settled
+    ctx.fillStyle = GLOW[vis] || GLOW.idle;
+    ctx.fillRect(x + 6, y + 6, 28, 14);
+    if (vis === "working" || vis === "bad") {
       ctx.globalAlpha = 0.35 + 0.25 * Math.sin(now / 180 + x);
-      ctx.fillRect(x - 2, y - 1, 24, 15);
+      ctx.fillRect(x - 8, y - 2, 96, 30);
       ctx.globalAlpha = 1;
     }
 
-    // person
-    var present = desk.state !== "idle" && desk.state !== "off";
-    var tint = ROLE_TINT[id] || "#7c8ba0";
-    var bodyY = y + 14;
-    var bob = present ? Math.sin(now / 140 + x) * 1.1 : 0;
+    // person — present (a colored body, not just idle-grey) for anything but true idle
+    var present = vis !== "idle";
+    var tint = (vis === "working" || vis === "done" || vis === "bad")
+      ? (ROLE_TINT[id] || "#7c8ba0")
+      : (PERSON_TINT[vis] || PERSON_TINT.idle);
+    var bodyY = y + 28;
+    var bob = desk.activeNow ? Math.sin(now / 140 + x) * 2 : 0;
 
-    ctx.fillStyle = present ? tint : "#333f52";
-    ctx.fillRect(x + 6, bodyY + 4 + bob, 8, 7);          // torso
-    ctx.fillStyle = present ? "#e6b98c" : "#3a4658";
-    ctx.fillRect(x + 7, bodyY + bob, 6, 6);               // head
+    ctx.fillStyle = tint;
+    ctx.fillRect(x + 12, bodyY + 8 + bob, 16, 14);        // torso
+    ctx.fillStyle = present ? HEAD_LIT : HEAD_IDLE;
+    ctx.fillRect(x + 14, bodyY + bob, 12, 12);            // head
 
-    if (desk.state === "working") {
+    if (desk.activeNow && desk.state === "working") {
       ctx.fillStyle = "#ffb545";
       var dotPhase = Math.floor(now / 260) % 3;
       for (var i = 0; i < 3; i++) {
         ctx.globalAlpha = i === dotPhase ? 1 : 0.25;
-        ctx.fillRect(x + 6 + i * 3, bodyY - 5 + bob, 2, 2);
+        ctx.fillRect(x + 12 + i * 6, bodyY - 10 + bob, 4, 4);
       }
       ctx.globalAlpha = 1;
-    } else if (desk.state === "done") {
+    } else if (vis === "resting" || (desk.activeNow && desk.state === "done")) {
       ctx.fillStyle = "#5fd3a0";
-      ctx.fillRect(x + 8, bodyY - 6, 4, 2);
-    } else if (desk.state === "bad") {
+      ctx.fillRect(x + 16, bodyY - 12, 8, 4);
+    } else if (vis === "issue" || (desk.activeNow && desk.state === "bad")) {
       ctx.fillStyle = "#ff6b6b";
-      ctx.font = "7px 'Silkscreen', monospace";
-      ctx.fillText("!", x + 9, bodyY - 3);
+      ctx.font = "14px 'Silkscreen', monospace";
+      ctx.fillText("!", x + 18, bodyY - 5);
     }
 
-    ctx.font = "5px 'Silkscreen', monospace";
-    ctx.fillStyle = present ? "#dce6f0" : "#4c5a6e";
-    ctx.fillText(desk.short, x - 1, y + 27);
+    ctx.font = "10px 'Silkscreen', monospace";
+    ctx.fillStyle = present ? "#dce6f0" : "#5b6a82";
+    ctx.fillText(desk.short, x - 2, y + 54);
   }
 
   function draw(now) { drawDept(now); }
