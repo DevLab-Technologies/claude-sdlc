@@ -1,0 +1,1298 @@
+<title>Pipeline Floor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Archivo+Expanded:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Silkscreen&display=swap">
+<style>
+  :root {
+    --floor: #171f2b;
+    --floor-line: #212c3c;
+    --wall: #10161f;
+    --panel: #131b26;
+    --panel-line: #22303f;
+    --desk: #2b3a4d;
+    --desk-top: #364a63;
+    --ink: #dce6f0;
+    --ink-dim: #7c8ba0;
+    --ink-faint: #4c5a6e;
+    --signal: #ffb545;
+    --signal-dim: #8a6127;
+    --ok: #5fd3a0;
+    --warn: #ffb545;
+    --bad: #ff6b6b;
+    --idle: #46536a;
+    --skin: #e6b98c;
+
+    --font-display: "Archivo Expanded", "Archivo", sans-serif;
+    --font-ui: "Archivo", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    --font-pixel: "Silkscreen", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--wall);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-height: 480px;
+  }
+
+  /* ---------- header ---------- */
+
+  header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 18px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-line);
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-right: auto;
+  }
+
+  .brand .mark {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .brand .mark span { color: var(--signal); }
+
+  .brand .tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-faint);
+    border: 1px solid var(--panel-line);
+    border-radius: 3px;
+    padding: 2px 6px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .gate-rail {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .gate-pill {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.03em;
+    color: var(--ink-faint);
+    background: var(--floor);
+    border: 1px solid var(--panel-line);
+    border-radius: 3px;
+    padding: 4px 7px;
+    white-space: nowrap;
+    transition: color .3s, background .3s, border-color .3s;
+  }
+
+  .gate-pill.active {
+    color: #1a1206;
+    background: var(--signal);
+    border-color: var(--signal);
+    font-weight: 600;
+  }
+
+  .gate-pill.done {
+    color: #0d2019;
+    background: var(--ok);
+    border-color: var(--ok);
+  }
+
+  .gate-pill.bad {
+    color: #2a0d0d;
+    background: var(--bad);
+    border-color: var(--bad);
+  }
+
+  .cycle-badge {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    white-space: nowrap;
+  }
+
+  .cycle-badge b { color: var(--ink); }
+
+  /* ---------- main split ---------- */
+
+  main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+
+  .floor-wrap {
+    flex: 1 1 68%;
+    position: relative;
+    background: var(--wall);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    min-width: 0;
+  }
+
+  canvas#floor {
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 8 / 5;
+    max-width: 1040px;
+    max-height: 100%;
+    background: var(--floor);
+    border: 1px solid var(--panel-line);
+    border-radius: 2px;
+  }
+
+  .floor-caption {
+    position: absolute;
+    left: 22px;
+    bottom: 20px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    background: rgba(19, 27, 38, .82);
+    border: 1px solid var(--panel-line);
+    border-radius: 3px;
+    padding: 6px 10px;
+    max-width: 60%;
+  }
+
+  .floor-caption b { color: var(--signal); font-weight: 600; }
+
+  aside {
+    flex: 1 1 32%;
+    max-width: 380px;
+    min-width: 260px;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-line);
+    min-height: 0;
+  }
+
+  .panel-block {
+    border-bottom: 1px solid var(--panel-line);
+    padding: 12px 14px;
+  }
+
+  .panel-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .panel-label .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 6px var(--ok);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  .current-line {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+
+  .current-line .who { color: var(--signal); font-weight: 600; }
+
+  .signoff-card {
+    display: none;
+    border: 1px solid var(--signal-dim);
+    background: linear-gradient(180deg, rgba(255,181,69,.08), rgba(255,181,69,.02));
+    border-radius: 3px;
+    padding: 9px 10px;
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--ink-dim);
+  }
+
+  .signoff-card.show { display: block; }
+
+  .signoff-card .k { color: var(--signal); font-weight: 600; }
+
+  .ticker {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.7;
+    scrollbar-width: thin;
+    scrollbar-color: var(--panel-line) transparent;
+  }
+
+  .ticker-row {
+    display: grid;
+    grid-template-columns: 46px 14px 1fr;
+    gap: 7px;
+    color: var(--ink-dim);
+    opacity: 0;
+    animation: rowIn .35s ease-out forwards;
+  }
+
+  @keyframes rowIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+  .ticker-row .t { color: var(--ink-faint); }
+  .ticker-row .b { text-align: center; }
+  .ticker-row .b.start::before { content: "▸"; color: var(--warn); }
+  .ticker-row .b.done::before { content: "✓"; color: var(--ok); }
+  .ticker-row .b.bad::before { content: "✕"; color: var(--bad); }
+  .ticker-row .b.note::before { content: "·"; color: var(--ink-faint); }
+  .ticker-row .m { color: var(--ink); }
+  .ticker-row .m .agent { color: var(--signal); }
+  .ticker-row.sev-bad .m { color: var(--bad); }
+  .ticker-row.sev-warn .m { color: var(--warn); }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .stat {
+    background: var(--floor);
+    border: 1px solid var(--panel-line);
+    border-radius: 3px;
+    padding: 8px 8px 7px;
+    text-align: center;
+  }
+
+  .stat .n {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat.bad .n { color: var(--bad); }
+  .stat.ok .n { color: var(--ok); }
+
+  .stat .l {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* ---------- controls ---------- */
+
+  footer {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: var(--panel);
+    border-top: 1px solid var(--panel-line);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    flex-wrap: wrap;
+  }
+
+  button.ctl {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    background: var(--floor);
+    border: 1px solid var(--panel-line);
+    border-radius: 3px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+
+  button.ctl:hover { border-color: var(--signal-dim); color: var(--signal); }
+  button.ctl:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
+  button.ctl.on { color: #1a1206; background: var(--signal); border-color: var(--signal); }
+
+  .proto-tag {
+    margin-left: auto;
+    color: var(--bad);
+    border: 1px solid #5a2323;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  canvas#floor { cursor: default; }
+
+  /* ---------- agent modal ---------- */
+
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 11, 16, 0.62);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+
+  .modal-backdrop.show { display: flex; }
+
+  .modal-card {
+    width: 100%;
+    max-width: 380px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 4px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+
+  .modal-head .who {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .modal-head .who .id {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    word-break: break-word;
+  }
+
+  .modal-head .who .dept {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .modal-status {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+
+  .modal-status.st-working { color: #1a1206; background: var(--signal); }
+  .modal-status.st-resting { color: #0d2019; background: var(--ok); }
+  .modal-status.st-issue   { color: #2a0d0d; background: var(--bad); }
+  .modal-status.st-idle    { color: var(--ink-faint); background: var(--floor); border-color: var(--panel-line); }
+
+  .modal-close {
+    flex: none;
+    background: transparent;
+    border: none;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+
+  .modal-close:hover { color: var(--ink); }
+
+  .modal-now {
+    padding: 12px 16px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    border-bottom: 1px solid var(--panel-line);
+  }
+
+  .modal-now .label {
+    display: block;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .modal-log {
+    overflow-y: auto;
+    padding: 10px 16px 14px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.7;
+  }
+
+  .modal-log .label {
+    display: block;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .modal-log .entry { color: var(--ink-dim); }
+  .modal-log .entry.bad { color: var(--bad); }
+  .modal-log .entry .b::before { content: "▸ "; color: var(--ink-faint); }
+  .modal-log .entry.done .b::before { content: "✓ "; color: var(--ok); }
+  .modal-log .entry.bad .b::before { content: "✕ "; color: var(--bad); }
+  .modal-log .empty { color: var(--ink-faint); font-style: italic; }
+
+  @media (max-width: 760px) {
+    main { flex-direction: column; }
+    aside { max-width: none; border-left: none; border-top: 1px solid var(--panel-line); flex: 1 1 40%; }
+    .floor-wrap { flex: 1 1 55%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .panel-label .dot { animation: none; }
+    .ticker-row { animation: none; opacity: 1; }
+  }
+</style>
+
+<header>
+  <div class="brand">
+    <div class="mark">PIPELINE <span>FLOOR</span></div>
+    <div class="tag">prototype · scripted demo</div>
+  </div>
+  <div class="gate-rail" id="gateRail"></div>
+  <div class="cycle-badge">cycle <b id="cycleNum">1</b></div>
+</header>
+
+<main>
+  <div class="floor-wrap">
+    <canvas id="floor" width="960" height="600"></canvas>
+    <div class="floor-caption" id="floorCaption">warming up the floor&hellip;</div>
+  </div>
+
+  <aside>
+    <div class="panel-block">
+      <p class="panel-label"><span class="dot"></span>now</p>
+      <div class="current-line" id="currentLine">intake reading the brief</div>
+      <div class="signoff-card" id="signoffCard">
+        <span class="k">NOT verified —</span> <span id="signoffText"></span>
+      </div>
+    </div>
+
+    <div class="panel-block">
+      <div class="stat-grid">
+        <div class="stat"><div class="n" id="statBlocker">0</div><div class="l">blocker</div></div>
+        <div class="stat"><div class="n" id="statMajor">0</div><div class="l">major</div></div>
+        <div class="stat ok"><div class="n" id="statVerified">0</div><div class="l">verified</div></div>
+      </div>
+    </div>
+
+    <p class="panel-label" style="padding: 10px 14px 0;"><span class="dot"></span>live feed — simulated</p>
+    <div class="ticker" id="ticker"></div>
+  </aside>
+</main>
+
+<footer>
+  <button class="ctl on" id="btnPlay">⏸ pause</button>
+  <button class="ctl" id="btnSpeed">1×</button>
+  <button class="ctl" id="btnRestart">↺ restart</button>
+  <span class="proto-tag">not wired to a real run — every event below is scripted</span>
+</footer>
+
+<div class="modal-backdrop" id="agentModal">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalId">
+    <div class="modal-head">
+      <div class="who">
+        <div class="id" id="modalId">—</div>
+        <div class="dept" id="modalDept">—</div>
+      </div>
+      <span class="modal-status" id="modalStatus">—</span>
+      <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-now">
+      <span class="label">right now</span>
+      <span id="modalNow">—</span>
+      <br><span class="label" style="margin-top:8px;">time worked this run</span>
+      <span id="modalTime">—</span>
+    </div>
+    <div class="modal-log">
+      <span class="label">what it did this run</span>
+      <div id="modalLog"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============================================================
+     ROSTER — desks, grouped by department, laid out on a grid.
+     Coordinates are grid cells; the canvas is a fixed small
+     resolution and scaled up by CSS for the pixel look.
+     ============================================================ */
+
+  var GATES = ["intake","research","product","design","ux-audit","architecture",
+               "test-plan","implementation","review","qa","ui-qa","release"];
+
+  var DEPARTMENTS = [
+    { id: "intake",  label: "INTAKE",     row: 0, col: 0, desks: [
+      { id: "sdlc-intake", short: "INTAKE" }
+    ]},
+    { id: "research", label: "RESEARCH",  row: 0, col: 2, desks: [
+      { id: "sdlc-researcher-findings",   short: "FINDINGS" },
+      { id: "sdlc-researcher-prior-art",  short: "PRIOR-ART" },
+      { id: "sdlc-researcher-constraints",short: "CONSTRNT" }
+    ]},
+    { id: "product", label: "PRODUCT",    row: 0, col: 6, desks: [
+      { id: "sdlc-product-owner", short: "PRODUCT" }
+    ]},
+    { id: "design",  label: "DESIGN",     row: 0, col: 8, desks: [
+      { id: "sdlc-ux-designer", short: "DESIGN" }
+    ]},
+    { id: "ux-audit", label: "UX AUDIT",  row: 2, col: 8, desks: [
+      { id: "sdlc-ux-auditor", short: "UX-AUDIT" }
+    ]},
+    { id: "architecture", label: "ARCHITECTURE", row: 2, col: 6, desks: [
+      { id: "sdlc-architect", short: "ARCHITECT" }
+    ]},
+    { id: "testplan", label: "TEST PLAN", row: 2, col: 3, desks: [
+      { id: "sdlc-qa-functional", short: "QA-PLAN" }
+    ]},
+    { id: "implementation", label: "IMPLEMENTATION", row: 2, col: 0, desks: [
+      { id: "sdlc-implementer-a", short: "IMPL-A" },
+      { id: "sdlc-implementer-b", short: "IMPL-B" },
+      { id: "sdlc-implementer-c", short: "IMPL-C" }
+    ]},
+    { id: "review", label: "REVIEW FLOOR", row: 4, col: 0, desks: [
+      { id: "sdlc-review-lead",        short: "LEAD" },
+      { id: "sdlc-code-reviewer",      short: "CORRECT" },
+      { id: "sdlc-review-security",    short: "SECURITY" },
+      { id: "sdlc-review-performance", short: "PERF" },
+      { id: "sdlc-review-tests",       short: "TESTS" }
+    ]},
+    { id: "debugger", label: "DEBUG BENCH", row: 4, col: 6, desks: [
+      { id: "sdlc-debugger", short: "DEBUG" }
+    ]},
+    { id: "qa", label: "QA / RELEASE", row: 4, col: 8, desks: [
+      { id: "sdlc-qa-ui",         short: "UI-QA" },
+      { id: "sdlc-release-gate",  short: "RELEASE" }
+    ]}
+  ];
+
+  var TILE = 52;                 // grid cell size in canvas px (internal resolution)
+  var ORIGIN_X = 52, ORIGIN_Y = 60;
+
+  // Every desk carries two things that must not be conflated:
+  //   state      — what is happening THIS instant (only meaningful while activeNow)
+  //   completed / hasOpenIssue — sticky facts that persist once true, so a desk that
+  //   finished its work keeps reading as "finished" instead of reverting to "never
+  //   touched" the moment the script moves on. That collapse was the original bug.
+  var DESKS = {};                // id -> {x,y,short,dept,state,activeNow,completed,hasOpenIssue}
+  var DEPT_LABELS = [];
+
+  // Spread multipliers: the department grid (col 0-8, row 0-4) is deliberately
+  // sparse so desks read as distinct floor zones with real walkways between them,
+  // rather than clustering in one corner of the canvas.
+  var SPREAD_X = 1.6, SPREAD_Y = 1.85;
+
+  DEPARTMENTS.forEach(function (dept) {
+    var perRow = 3;
+    dept.desks.forEach(function (d, i) {
+      var dx = i % perRow, dy = Math.floor(i / perRow);
+      var x = ORIGIN_X + (dept.col * SPREAD_X + dx * 1.3) * TILE;
+      var y = ORIGIN_Y + (dept.row * SPREAD_Y + dy * 1.3) * TILE;
+      DESKS[d.id] = { x: x, y: y, short: d.short, dept: dept.id, label: d.short,
+        state: "idle", activeNow: false, completed: false, hasOpenIssue: false, log: [], totalRealMs: 0 };
+    });
+    DEPT_LABELS.push({ x: ORIGIN_X + dept.col * SPREAD_X * TILE, y: ORIGIN_Y + dept.row * SPREAD_Y * TILE - 20, text: dept.label });
+  });
+
+  // Ticker lines address agents by a short form ("review-lead", "code-reviewer").
+  // Map every such form back to its desk id so a click on a desk can show the
+  // lines that were actually about it.
+  var WHO_TO_DESK = {};
+  Object.keys(DESKS).forEach(function (id) { WHO_TO_DESK[id.replace(/^sdlc-/, "")] = id; });
+  WHO_TO_DESK["research-findings"] = "sdlc-researcher-findings";
+  WHO_TO_DESK["research-prior-art"] = "sdlc-researcher-prior-art";
+  WHO_TO_DESK["research-constraints"] = "sdlc-researcher-constraints";
+
+  var ROLE_TINT = {
+    "sdlc-intake": "#6fa8ff",
+    "sdlc-researcher-findings": "#6fd6c9", "sdlc-researcher-prior-art": "#6fd6c9", "sdlc-researcher-constraints": "#6fd6c9",
+    "sdlc-product-owner": "#c98bf0",
+    "sdlc-ux-designer": "#f08bd0", "sdlc-ux-auditor": "#f08bd0",
+    "sdlc-architect": "#8bb4f0",
+    "sdlc-qa-functional": "#f0c98b",
+    "sdlc-implementer-a": "#9ad17a", "sdlc-implementer-b": "#9ad17a", "sdlc-implementer-c": "#9ad17a",
+    "sdlc-review-lead": "#ffb545", "sdlc-code-reviewer": "#7a9ad1", "sdlc-review-security": "#e06a6a",
+    "sdlc-review-performance": "#e0b06a", "sdlc-review-tests": "#7ad1c4",
+    "sdlc-debugger": "#d17a9a",
+    "sdlc-qa-ui": "#f0c98b", "sdlc-release-gate": "#ffd76a"
+  };
+
+  /* ============================================================
+     SCRIPT — a compressed but representative pass through the
+     real phase sequence, including the two genuine fan-outs
+     (research x3, review x5), the phase 5/6 overlap, and one
+     defect-loop beat through the debugger.
+     ============================================================ */
+
+  function step(desks, opts) {
+    opts = opts || {};
+    return Object.assign({ desks: desks, dur: 1500, state: "working", real: 0, phase: null }, opts);
+  }
+
+  // "real" is a plausible wall-clock duration (ms) this beat represents — separate
+  // from "dur", which only paces the on-screen animation. Every desk in a step
+  // accrues "real" onto its own total; "phase" says which gate bucket the step's
+  // real time counts toward. Phase totals are a deliberate approximation (a step
+  // whose desks belong to more than one phase attributes its whole duration to
+  // one), the same way the real /sdlc-timing report separates wall-clock from
+  // summed agent-time rather than pretending either number is exact for both.
+  var SCRIPT = [
+    step(["sdlc-intake"], { gate: null, phase: "intake", real: 220000,
+      caption: "Intake is reading the raw request and writing scope.md.",
+      current: "<span class=\"who\">intake</span> — scoping the request" }),
+    step(["sdlc-intake"], { dur: 900, state: "done", gate: "intake", phase: "intake",
+      ticker: [["start","intake","phase_start"],["done","intake","run_complete → scope.md, assumptions.md"]],
+      current: "<span class=\"who\">intake</span> — scope.md complete" }),
+
+    step(["sdlc-researcher-findings","sdlc-researcher-prior-art","sdlc-researcher-constraints"], {
+      dur: 2000, phase: "research", real: 380000,
+      caption: "Three research lenses run concurrently — no shared dependency, so no reason to serialize them.",
+      ticker: [["start","research-findings","phase_start"],["start","research-prior-art","phase_start"],["start","research-constraints","phase_start"]],
+      current: "<span class=\"who\">3 research lenses</span> — running concurrently" }),
+    step(["sdlc-researcher-findings","sdlc-researcher-prior-art","sdlc-researcher-constraints"], {
+      dur: 700, state: "done", gate: "research", phase: "research",
+      ticker: [["done","research-findings","run_complete → findings.md"],["done","research-prior-art","run_complete → prior-art.md"],["done","research-constraints","run_complete → constraints.md"]],
+      current: "<span class=\"who\">research</span> — all three lenses filed" }),
+
+    step(["sdlc-product-owner"], { dur: 1700, phase: "product", real: 430000,
+      ticker: [["start","product-owner","phase_start"]],
+      current: "<span class=\"who\">product owner</span> — drafting the PRD" }),
+    step(["sdlc-product-owner"], { dur: 700, state: "done", gate: "product", phase: "product",
+      ticker: [["done","product-owner","run_complete → prd.md, 6 stories"]],
+      current: "<span class=\"who\">product owner</span> — PRD + stories done" }),
+
+    step(["sdlc-ux-designer"], { dur: 1700, phase: "design", real: 500000,
+      ticker: [["start","ux-designer","phase_start"]],
+      current: "<span class=\"who\">ux designer</span> — flows and screen states" }),
+    step(["sdlc-ux-designer"], { dur: 700, state: "done", gate: "design", phase: "design",
+      ticker: [["done","ux-designer","run_complete → 4 screens specified"]],
+      current: "<span class=\"who\">ux designer</span> — spec complete" }),
+
+    step(["sdlc-ux-auditor","sdlc-architect","sdlc-qa-functional"], { dur: 2200, phase: "architecture", real: 300000,
+      caption: "The architect drafts data model + interfaces while UX audit runs — and QA starts the test plan the moment UX audit passes, in parallel with architecture. Neither waits on a dependency it doesn't have.",
+      ticker: [["start","ux-auditor","phase_start"],["start","architect","phase_start — drafting interfaces.md"]],
+      current: "<span class=\"who\">ux audit</span> + <span class=\"who\">architecture</span> — overlapping" }),
+    step(["sdlc-ux-auditor"], { dur: 500, state: "done", gate: "ux-audit", phase: "ux-audit", real: 60000,
+      ticker: [["done","ux-auditor","run_complete → audit.md, 0 blockers"]],
+      current: "<span class=\"who\">ux audit</span> — passed" }),
+    step(["sdlc-architect","sdlc-qa-functional"], { dur: 1600, phase: "architecture", real: 250000,
+      ticker: [["note","qa-functional","test plan authoring begins — needs product + design only"]],
+      current: "<span class=\"who\">architect</span> writing interfaces.md · <span class=\"who\">qa</span> drafting cases" }),
+    step(["sdlc-architect"], { dur: 500, state: "done", gate: "architecture", phase: "architecture", real: 20000,
+      ticker: [["done","architect","run_complete → architecture.md, interfaces.md, ADR-0003"]],
+      current: "<span class=\"who\">architecture</span> — contract published" }),
+
+    step(["sdlc-qa-functional","sdlc-architect"], { dur: 1400, phase: "test-plan", real: 180000,
+      caption: "Test plan review: the architect checks for missing failure modes, the product owner checks coverage — independent lenses, launched together.",
+      ticker: [["note","qa-functional","folding in architecture-derived cases (step 3)"]],
+      current: "<span class=\"who\">test plan</span> — architect + product owner reviewing" }),
+    step(["sdlc-qa-functional"], { dur: 600, state: "done", gate: "test-plan", phase: "test-plan", real: 20000,
+      ticker: [["done","qa-functional","test_plan_approved → 22 cases, 4 e2e"]],
+      current: "<span class=\"who\">test plan</span> — approved" }),
+
+    step(["sdlc-implementer-a","sdlc-implementer-b","sdlc-implementer-c"], { dur: 2300, phase: "implementation", real: 1400000,
+      caption: "Three implementers on file-disjoint tasks from the workplan, writing their assigned TC cases alongside the code.",
+      ticker: [["start","implementer-a","phase_start — TASK-001"],["start","implementer-b","phase_start — TASK-002"],["start","implementer-c","phase_start — TASK-003"]],
+      current: "<span class=\"who\">3 implementers</span> — parallel, file-disjoint" }),
+    step(["sdlc-implementer-a","sdlc-implementer-b","sdlc-implementer-c"], { dur: 700, state: "done", gate: "implementation", phase: "implementation",
+      ticker: [["done","implementer-a","run_complete → session.ts"],["done","implementer-b","run_complete → middleware.ts"],["done","implementer-c","run_complete → session.test.ts"]],
+      current: "<span class=\"who\">implementation</span> — all tasks landed" }),
+
+    step(["sdlc-review-lead"], { dur: 1100, phase: "review", real: 45000,
+      ticker: [["start","review-lead","verify-fast — build, typecheck, diff scope"]],
+      current: "<span class=\"who\">review lead</span> — verify-fast" }),
+    step(["sdlc-review-lead","sdlc-code-reviewer","sdlc-review-security","sdlc-review-performance","sdlc-review-tests"], {
+      dur: 2400, phase: "review", real: 280000,
+      caption: "Five review lenses at once. verify-slow (the suite) runs alongside the four static lenses — only the tests lens actually needs its output.",
+      ticker: [["start","review-lead","verify-slow — running suite"],["start","code-reviewer","phase_start"],["start","review-security","phase_start"],["start","review-performance","phase_start"]],
+      current: "<span class=\"who\">5 lenses</span> — correctness · security · perf · compliance · verify-slow" }),
+    step(["sdlc-review-security"], { dur: 700, state: "bad", phase: "review", gate: "review",
+      ticker: [["bad","review-security","SEC-2 — session token compared with ==, not constant-time"]],
+      sev: "bad",
+      current: "<span class=\"who\">review-security</span> — found SEC-2 (blocker)" }),
+    step(["sdlc-review-tests"], { dur: 900, phase: "review", real: 150000,
+      ticker: [["start","review-tests","phase_start — after verify-slow landed"]],
+      current: "<span class=\"who\">review-tests</span> — checking assertions against the plan" }),
+    step(["sdlc-review-lead"], { dur: 900, state: "done", phase: "review", real: 90000, majorDelta: 2,
+      ticker: [["done","review-lead","synthesize → ISSUE-014 (blocker), 2 major"]],
+      signoff: "session comparison timing not covered by the plan's existing cases — flagged for a new TC.",
+      current: "<span class=\"who\">review lead</span> — synthesized, gate <b>failed</b>" }),
+
+    step(["sdlc-debugger"], { dur: 1800, phase: "review", real: 600000,
+      caption: "A blocker with an unproven mechanism goes to the debugger first — never straight to a fix.",
+      ticker: [["start","debugger","phase_start — reproducing ISSUE-014"]],
+      current: "<span class=\"who\">debugger</span> — reproducing, then proving the cause" }),
+    step(["sdlc-debugger"], { dur: 700, state: "done", phase: "review",
+      ticker: [["done","debugger","root_cause_found → INV-003, non-constant-time compare"]],
+      current: "<span class=\"who\">debugger</span> — root cause proven" }),
+    step(["sdlc-implementer-a"], { dur: 1300, state: "working", phase: "review", real: 480000,
+      ticker: [["start","implementer-a","fix mode — ISSUE-014"]],
+      current: "<span class=\"who\">implementer</span> — fixing, plus the regression test" }),
+    step(["sdlc-review-lead"], { dur: 900, state: "done", gate: "review", phase: "review", real: 120000,
+      blockerDelta: -1, majorDelta: -2,
+      ticker: [["done","review-lead","re-verified → 0 blocker, 0 major"]],
+      current: "<span class=\"who\">review</span> — passed on cycle 2" }),
+
+    step(["sdlc-qa-functional"], { dur: 1900, phase: "qa", real: 700000,
+      ticker: [["start","qa-functional","execute mode — running the approved plan"]],
+      current: "<span class=\"who\">qa</span> — executing 22 cases against the build" }),
+    step(["sdlc-qa-functional"], { dur: 600, state: "done", gate: "qa", phase: "qa",
+      ticker: [["done","qa-functional","22/22 passing, ISSUE-014 verified"]],
+      current: "<span class=\"who\">qa</span> — all cases passing" }),
+
+    step(["sdlc-qa-ui"], { dur: 1700, phase: "ui-qa", real: 600000,
+      ticker: [["start","qa-ui","phase_start — states, responsive, a11y"]],
+      current: "<span class=\"who\">ui qa</span> — walking every screen state" }),
+    step(["sdlc-qa-ui"], { dur: 600, state: "done", gate: "ui-qa", phase: "ui-qa",
+      ticker: [["done","qa-ui","run_complete → 0 console errors, 3 widths checked"]],
+      current: "<span class=\"who\">ui qa</span> — matches spec" }),
+
+    step(["sdlc-release-gate"], { dur: 1600, phase: "release", real: 280000,
+      ticker: [["start","release-gate","auditing every sign-off"]],
+      signoff: "release gate covers evidence review only — production rollout risk is outside its scope.",
+      current: "<span class=\"who\">release gate</span> — checking the traceability matrix" }),
+    step(["sdlc-release-gate"], { dur: 900, state: "done", gate: "release", phase: "release",
+      ticker: [["done","release-gate","shipped → cycle 2, 1 blocker found and closed"]],
+      current: "<b style=\"color:var(--ok)\">shipped</b> — feature ready" })
+  ];
+
+  /* ============================================================
+     DRIVER
+     ============================================================ */
+
+  var canvas = document.getElementById("floor");
+  var ctx = canvas.getContext("2d");
+
+  // Built once — every argument is a constant derived from the canvas's fixed
+  // dimensions, so there is nothing here for a per-frame rebuild to buy.
+  var vignetteGrad = ctx.createRadialGradient(
+    canvas.width / 2, canvas.height / 2, canvas.height * 0.28,
+    canvas.width / 2, canvas.height / 2, canvas.width * 0.72
+  );
+  vignetteGrad.addColorStop(0, "rgba(0,0,0,0)");
+  vignetteGrad.addColorStop(1, "rgba(0,0,0,0.4)");
+  var gateRailEl = document.getElementById("gateRail");
+  var tickerEl = document.getElementById("ticker");
+  var currentLineEl = document.getElementById("currentLine");
+  var floorCaptionEl = document.getElementById("floorCaption");
+  var cycleNumEl = document.getElementById("cycleNum");
+  var signoffCard = document.getElementById("signoffCard");
+  var signoffText = document.getElementById("signoffText");
+  var statBlocker = document.getElementById("statBlocker");
+  var statMajor = document.getElementById("statMajor");
+  var statVerified = document.getElementById("statVerified");
+
+  GATES.forEach(function (g) {
+    var pill = document.createElement("span");
+    pill.className = "gate-pill";
+    pill.dataset.gate = g;
+    pill.textContent = g;
+    gateRailEl.appendChild(pill);
+  });
+
+  var stepIndex = -1;
+  var stepStart = 0;
+  var playing = true;
+  var speed = 1;
+  var counts = { blocker: 0, major: 0, verified: 0 };
+  var lastTs = null;
+  var raf = null;
+  var hoveredDesk = null;
+  var wasPlayingBeforeModal = true;
+  var phaseTotals = {};
+
+  // Same day/hour/minute/second/ms rule the real /sdlc-timing report uses: at most
+  // two units, largest first, second dropped when zero, ms only under one second.
+  function fmtDuration(ms) {
+    if (ms < 1000) return Math.round(ms) + "ms";
+    var s = Math.round(ms / 1000);
+    if (s < 60) return s + "s";
+    var m = Math.floor(s / 60); s = s % 60;
+    if (m < 60) return s ? (m + "m " + s + "s") : (m + "m");
+    var h = Math.floor(m / 60); m = m % 60;
+    if (h < 24) return m ? (h + "h " + m + "m") : (h + "h");
+    var d = Math.floor(h / 24); h = h % 24;
+    return h ? (d + "d " + h + "h") : (d + "d");
+  }
+
+  var pauseStartedAt = null;
+
+  function setPlaying(v) {
+    // stepStart is compared against live wall-clock time, so time spent paused
+    // has to be excluded from that comparison on resume, or the step in progress
+    // when pause was hit gets skipped the instant playback resumes.
+    if (!v && playing) { pauseStartedAt = performance.now(); }
+    else if (v && !playing && pauseStartedAt != null) {
+      stepStart += performance.now() - pauseStartedAt;
+      pauseStartedAt = null;
+    }
+    playing = v;
+    var btn = document.getElementById("btnPlay");
+    btn.classList.toggle("on", playing);
+    btn.textContent = playing ? "⏸ pause" : "▶ play";
+  }
+
+  function resetAll() {
+    Object.keys(DESKS).forEach(function (id) {
+      var d = DESKS[id];
+      d.state = "idle"; d.activeNow = false; d.completed = false; d.hasOpenIssue = false;
+      d.log = []; d.totalRealMs = 0;
+    });
+    phaseTotals = {};
+    gateRailEl.querySelectorAll(".gate-pill").forEach(function (p) {
+      p.className = "gate-pill";
+      p.textContent = p.dataset.gate;
+    });
+    tickerEl.innerHTML = "";
+    counts = { blocker: 0, major: 0, verified: 0 };
+    statBlocker.textContent = "0"; statMajor.textContent = "0"; statVerified.textContent = "0";
+    cycleNumEl.textContent = "1";
+    signoffCard.classList.remove("show");
+    floorCaptionEl.innerHTML = "warming up the floor&hellip;";
+    stepIndex = -1;
+    stepStart = performance.now();
+  }
+
+  function addTickerLine(kind, who, text) {
+    var row = document.createElement("div");
+    row.className = "ticker-row" + (kind === "bad" ? " sev-bad" : "");
+    var t = new Date();
+    var hh = String(t.getHours()).padStart(2, "0"), mm = String(t.getMinutes()).padStart(2, "0"), ss = String(t.getSeconds()).padStart(2, "0");
+    row.innerHTML =
+      '<span class="t">' + hh + ":" + mm + ":" + ss + '</span>' +
+      '<span class="b ' + kind + '"></span>' +
+      '<span class="m"><span class="agent">' + who + '</span> ' + text + '</span>';
+    tickerEl.appendChild(row);
+    tickerEl.scrollTop = tickerEl.scrollHeight;
+    while (tickerEl.children.length > 60) tickerEl.removeChild(tickerEl.firstChild);
+  }
+
+  function setGate(name, cls) {
+    if (!name) return;
+    var pill = gateRailEl.querySelector('.gate-pill[data-gate="' + name + '"]');
+    if (pill) pill.className = "gate-pill " + cls;
+  }
+
+  // Only called when a gate actually finishes — appends its accumulated phase
+  // duration to the pill so "how long did this phase take" is visible without a
+  // click. Pending/active gates stay unlabeled since they have no final duration.
+  function markGateDone(name, cls) {
+    var pill = gateRailEl.querySelector('.gate-pill[data-gate="' + name + '"]');
+    if (!pill) return;
+    pill.className = "gate-pill " + cls;
+    pill.textContent = name + " · " + fmtDuration(phaseTotals[name] || 0);
+  }
+
+  function applyStep(s) {
+    // Only the desks in THIS step are "active now" — everyone else keeps whatever
+    // sticky state they already earned (completed / hasOpenIssue), which is what
+    // lets finished work stay visibly lit as the floor fills up.
+    Object.keys(DESKS).forEach(function (id) { DESKS[id].activeNow = false; });
+    s.desks.forEach(function (id) {
+      var d = DESKS[id];
+      if (!d) return;
+      d.activeNow = true;
+      d.state = s.state;
+      d.totalRealMs += s.real || 0;
+      if (s.state === "done") { d.completed = true; d.hasOpenIssue = false; }
+      if (s.state === "bad") { d.hasOpenIssue = true; }
+    });
+    if (s.phase) {
+      phaseTotals[s.phase] = (phaseTotals[s.phase] || 0) + (s.real || 0);
+    }
+    if (s.gate) {
+      markGateDone(s.gate, s.state === "bad" ? "bad" : "done");
+      // Only a real pass advances the rail — a "bad" mark just flags the gate in
+      // place, since the cycle hasn't actually moved on to the next phase yet.
+      if (s.state !== "bad") {
+        var idx = GATES.indexOf(s.gate);
+        if (idx > -1 && idx < GATES.length - 1) setGate(GATES[idx + 1], "active");
+      }
+    }
+    if (s.caption) floorCaptionEl.innerHTML = s.caption;
+    if (s.current) currentLineEl.innerHTML = s.current;
+    if (s.ticker) {
+      s.ticker.forEach(function (t) {
+        addTickerLine(t[0], t[1], t[2]);
+        var deskId = WHO_TO_DESK[t[1]];
+        if (deskId && DESKS[deskId]) {
+          DESKS[deskId].log.push({ kind: t[0], text: t[2] });
+          if (DESKS[deskId].log.length > 10) DESKS[deskId].log.shift();
+        }
+      });
+    }
+    if (s.sev === "bad") { counts.blocker++; statBlocker.textContent = counts.blocker; }
+    if (s.blockerDelta) {
+      counts.blocker = Math.max(0, counts.blocker + s.blockerDelta);
+      statBlocker.textContent = counts.blocker;
+    }
+    if (s.majorDelta) {
+      counts.major = Math.max(0, counts.major + s.majorDelta);
+      statMajor.textContent = counts.major;
+    }
+    if (s.state === "done" && /verified|passing|shipped/.test(JSON.stringify(s.ticker || ""))) {
+      counts.verified++; statVerified.textContent = counts.verified;
+    }
+    if (s.signoff) {
+      signoffText.textContent = s.signoff;
+      signoffCard.classList.add("show");
+    }
+    if (s.gate === "review" && s.state === "done") {
+      cycleNumEl.textContent = "2";
+    }
+  }
+
+  function nextStep(now) {
+    stepIndex++;
+    if (stepIndex >= SCRIPT.length) {
+      setTimeout(function () { resetAll(); nextStep(performance.now()); }, 2600);
+      return;
+    }
+    if (stepIndex === 0) setGate(GATES[0], "active");
+    applyStep(SCRIPT[stepIndex]);
+    stepStart = now;
+  }
+
+  function tick(now) {
+    raf = requestAnimationFrame(tick);
+    if (!playing) { lastTs = now; draw(now); return; }
+    if (lastTs == null) lastTs = now;
+    var dt = (now - lastTs) * speed;
+    lastTs = now;
+    if (stepIndex < 0) { nextStep(now); }
+    else {
+      var s = SCRIPT[stepIndex];
+      if (s && now - stepStart >= s.dur / speed) nextStep(now);
+    }
+    draw(now);
+  }
+
+  /* ---- rendering ---- */
+
+  function drawDept(now) {
+    ctx.fillStyle = "#171f2b";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // floor tile checker — two very close shades read as laid flooring instead
+    // of a flat void, without competing with anything drawn on top of it
+    for (var ty = 0; ty < canvas.height; ty += TILE) {
+      for (var tx = 0; tx < canvas.width; tx += TILE) {
+        var odd = ((Math.round(tx / TILE) + Math.round(ty / TILE)) % 2) === 0;
+        ctx.fillStyle = odd ? "rgba(255,255,255,0.014)" : "rgba(255,255,255,0.03)";
+        ctx.fillRect(tx, ty, TILE, TILE);
+      }
+    }
+
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    for (var gx = 0; gx <= canvas.width; gx += TILE) {
+      ctx.beginPath(); ctx.moveTo(gx + 0.5, 0); ctx.lineTo(gx + 0.5, canvas.height); ctx.stroke();
+    }
+    for (var gy = 0; gy <= canvas.height; gy += TILE) {
+      ctx.beginPath(); ctx.moveTo(0, gy + 0.5); ctx.lineTo(canvas.width, gy + 0.5); ctx.stroke();
+    }
+
+    ctx.font = "13px 'Silkscreen', monospace";
+    ctx.fillStyle = "#7b8dab";
+    DEPT_LABELS.forEach(function (d) {
+      ctx.fillText(d.text, d.x, d.y);
+    });
+
+    Object.keys(DESKS).forEach(function (id) {
+      drawDesk(DESKS[id], now, id, id === hoveredDesk);
+    });
+
+    // vignette last, over everything, so the edges recede and the lit desks
+    // read as the brightest thing on the floor
+    ctx.fillStyle = vignetteGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Resolve the four things a desk can look like. "activeNow" (currently in the
+  // running step) always wins and gets the bright, animated treatment; otherwise
+  // a desk shows the sticky record of what happened to it: resting (finished),
+  // issue (finished with an unresolved problem), or idle (never started yet).
+  function visualState(desk) {
+    if (desk.activeNow) return desk.state;         // working | done | bad, this instant
+    if (desk.hasOpenIssue) return "issue";
+    if (desk.completed) return "resting";
+    return "idle";
+  }
+
+  var GLOW = { idle: "#3a4658", resting: "#2c6b52", issue: "#6b2f36",
+    working: "#ffb545", done: "#5fd3a0", bad: "#ff6b6b" };
+  var PERSON_TINT = { idle: "#48597a", resting: "#3fa87d", issue: "#c1595f" };
+  var HEAD_IDLE = "#3a4658", HEAD_LIT = "#e6b98c";
+  var OUTLINE = "rgba(9,13,20,0.6)";
+
+  function outline(x, y, w, h) {
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  }
+
+  function drawDesk(desk, now, id, hovered) {
+    var x = desk.x, y = desk.y;
+    var vis = visualState(desk);
+    var w = 40, h = 24;
+    var bodyY = y + 28;
+
+    // chair — grounds the sprite and fills the empty gap behind the desk
+    ctx.fillStyle = "#222c3b";
+    ctx.fillRect(x + 13, bodyY + 20, 14, 10);
+    outline(x + 13, bodyY + 20, 14, 10);
+
+    // desk surface
+    ctx.fillStyle = "#2b3a4d";
+    ctx.fillRect(x, y + 20, w, h);
+    ctx.fillStyle = "#3c5170";
+    ctx.fillRect(x, y + 20, w, 6);
+    outline(x, y + 20, w, h);
+
+    // monitor glow — bright while actively resolving, dim-but-colored once settled
+    ctx.fillStyle = GLOW[vis] || GLOW.idle;
+    ctx.fillRect(x + 6, y + 6, 28, 14);
+    outline(x + 6, y + 6, 28, 14);
+    if (vis === "working" || vis === "bad") {
+      ctx.globalAlpha = 0.45 + 0.3 * Math.sin(now / 180 + x);
+      ctx.fillRect(x + 1, y + 1, 36, 22);
+      ctx.globalAlpha = 1;
+    }
+
+    // person — present (a colored body, not just idle-grey) for anything but true idle
+    var present = vis !== "idle";
+    var tint = (vis === "working" || vis === "done" || vis === "bad")
+      ? (ROLE_TINT[id] || "#7c8ba0")
+      : (PERSON_TINT[vis] || PERSON_TINT.idle);
+    var bob = desk.activeNow ? Math.sin(now / 140 + x) * 2 : 0;
+
+    ctx.fillStyle = tint;
+    ctx.fillRect(x + 12, bodyY + 8 + bob, 16, 14);        // torso
+    outline(x + 12, bodyY + 8 + bob, 16, 14);
+    ctx.fillStyle = present ? HEAD_LIT : HEAD_IDLE;
+    ctx.fillRect(x + 14, bodyY + bob, 12, 12);            // head
+    outline(x + 14, bodyY + bob, 12, 12);
+
+    if (desk.activeNow && desk.state === "working") {
+      ctx.fillStyle = "#ffb545";
+      var dotPhase = Math.floor(now / 260) % 3;
+      for (var i = 0; i < 3; i++) {
+        ctx.globalAlpha = i === dotPhase ? 1 : 0.25;
+        ctx.fillRect(x + 12 + i * 6, bodyY - 10 + bob, 4, 4);
+      }
+      ctx.globalAlpha = 1;
+    } else if (vis === "resting" || (desk.activeNow && desk.state === "done")) {
+      ctx.fillStyle = "#5fd3a0";
+      ctx.fillRect(x + 16, bodyY - 12, 8, 4);
+    } else if (vis === "issue" || (desk.activeNow && desk.state === "bad")) {
+      ctx.fillStyle = "#ff6b6b";
+      ctx.font = "14px 'Silkscreen', monospace";
+      ctx.fillText("!", x + 18, bodyY - 5);
+    }
+
+    ctx.font = "10px 'Silkscreen', monospace";
+    ctx.fillStyle = present ? "#eef2f8" : "#66779a";
+    ctx.fillText(desk.short, x - 2, y + 62);
+
+    if (hovered) {
+      ctx.strokeStyle = "#ffb545";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(x - 12, y - 8, w + 24, 86);
+      ctx.setLineDash([]);
+    }
+  }
+
+  function draw(now) { drawDept(now); }
+
+  document.getElementById("btnPlay").addEventListener("click", function () {
+    setPlaying(!playing);
+  });
+
+  document.getElementById("btnSpeed").addEventListener("click", function () {
+    speed = speed === 1 ? 2 : speed === 2 ? 0.5 : 1;
+    this.textContent = speed + "×";
+  });
+
+  document.getElementById("btnRestart").addEventListener("click", function () {
+    resetAll();
+  });
+
+  /* ---- click-to-inspect ---- */
+
+  function canvasPoint(evt) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: (evt.clientX - rect.left) * (canvas.width / rect.width),
+      y: (evt.clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  function deskAt(px, py) {
+    // Box height must stay under the department row spacing (dy*1.3*TILE = 67.6px
+    // at the current TILE) or adjacent rows' hit-boxes overlap and a click near
+    // the boundary can resolve to the wrong desk.
+    var found = null;
+    Object.keys(DESKS).forEach(function (id) {
+      var d = DESKS[id];
+      if (px >= d.x - 12 && px <= d.x + 52 && py >= d.y - 4 && py <= d.y + 60) found = id;
+    });
+    return found;
+  }
+
+  var DEPT_LABEL_BY_ID = {};
+  DEPARTMENTS.forEach(function (dept) {
+    dept.desks.forEach(function (d) { DEPT_LABEL_BY_ID[d.id] = dept.label; });
+  });
+
+  var modalEl = document.getElementById("agentModal");
+  var modalId = document.getElementById("modalId");
+  var modalDept = document.getElementById("modalDept");
+  var modalStatus = document.getElementById("modalStatus");
+  var modalNow = document.getElementById("modalNow");
+  var modalTime = document.getElementById("modalTime");
+  var modalLog = document.getElementById("modalLog");
+
+  var STATUS_COPY = {
+    working: { cls: "st-working", text: "working" },
+    done:    { cls: "st-resting", text: "just finished" },
+    bad:     { cls: "st-issue",   text: "flagged an issue" },
+    resting: { cls: "st-resting", text: "done — resting" },
+    issue:   { cls: "st-issue",   text: "unresolved issue" },
+    idle:    { cls: "st-idle",    text: "not started yet" }
+  };
+
+  function openAgentModal(id) {
+    var d = DESKS[id];
+    if (!d) return;
+    var vis = visualState(d);
+    var status = STATUS_COPY[vis] || STATUS_COPY.idle;
+
+    modalId.textContent = id;
+    modalDept.textContent = DEPT_LABEL_BY_ID[id] || d.dept;
+    modalStatus.className = "modal-status " + status.cls;
+    modalStatus.textContent = status.text;
+    modalNow.textContent = d.activeNow
+      ? (currentLineEl.textContent || "active this step")
+      : (vis === "resting" ? "finished its part — waiting for the rest of the cycle."
+        : vis === "issue" ? "left an open finding — waiting on a fix."
+        : "hasn't been reached yet in this run.");
+    modalTime.textContent = d.totalRealMs > 0 ? fmtDuration(d.totalRealMs) : "not started yet";
+
+    modalLog.innerHTML = "";
+    if (!d.log.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "nothing logged yet.";
+      modalLog.appendChild(empty);
+    } else {
+      d.log.forEach(function (entry) {
+        var row = document.createElement("div");
+        row.className = "entry" + (entry.kind === "bad" ? " bad" : entry.kind === "done" ? " done" : "");
+        row.innerHTML = '<span class="b"></span>' + entry.text;
+        modalLog.appendChild(row);
+      });
+    }
+
+    wasPlayingBeforeModal = playing;
+    setPlaying(false);
+    modalEl.classList.add("show");
+  }
+
+  function closeAgentModal() {
+    modalEl.classList.remove("show");
+    setPlaying(wasPlayingBeforeModal);
+  }
+
+  canvas.addEventListener("mousemove", function (evt) {
+    var p = canvasPoint(evt);
+    var id = deskAt(p.x, p.y);
+    hoveredDesk = id;
+    canvas.style.cursor = id ? "pointer" : "default";
+  });
+
+  canvas.addEventListener("mouseleave", function () {
+    hoveredDesk = null;
+    canvas.style.cursor = "default";
+  });
+
+  canvas.addEventListener("click", function (evt) {
+    var p = canvasPoint(evt);
+    var id = deskAt(p.x, p.y);
+    if (id) openAgentModal(id);
+  });
+
+  document.getElementById("modalClose").addEventListener("click", closeAgentModal);
+  modalEl.addEventListener("click", function (evt) {
+    if (evt.target === modalEl) closeAgentModal();
+  });
+  document.addEventListener("keydown", function (evt) {
+    if (evt.key === "Escape" && modalEl.classList.contains("show")) closeAgentModal();
+  });
+
+  resetAll();
+  raf = requestAnimationFrame(tick);
+})();
+</script>
