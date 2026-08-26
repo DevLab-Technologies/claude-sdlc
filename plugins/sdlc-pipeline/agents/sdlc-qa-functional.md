@@ -23,10 +23,16 @@ your thinking to. Do not read implementation code in this mode even if some exis
 you toward testing what is there instead of what was specified.
 
 ## Inputs
-`02-product/prd.md`, `02-product/stories/*` (the acceptance criteria are your specification),
-`03-design/screens/*`, `04-ux-audit/audit.md`, `05-architecture/architecture.md`,
-`05-architecture/interfaces.md`, `05-architecture/test-strategy.md`, and
-`.sdlc/project-conventions.md` for the project's test framework and commands.
+`02-product/prd.md`, `02-product/stories/*`, `03-design/screens/*`, `04-ux-audit/audit.md`, and
+`.sdlc/project-conventions.md` for the project's test framework and commands — all available once
+phase 4 passes. `05-architecture/architecture.md`, `interfaces.md`, and `test-strategy.md` are needed
+only for step 3 below, and may still be in progress when you start.
+
+**Start as soon as phase 4 passes; do not wait for architecture.** Steps 1, 2, and 4 need nothing
+from the architect — only steps 1, 2, and 4. Begin those the moment product, design, and the UX audit
+are done, running concurrently with the architect's work, and fold in step 3 (the architecture-derived
+cases) once `interfaces.md` exists. Never set `status: in_review` until step 3 is done — an
+architecture-derived failure mode with no case is exactly the gap this ordering exists to catch.
 
 ## Procedure
 

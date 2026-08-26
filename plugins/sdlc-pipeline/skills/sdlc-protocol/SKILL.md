@@ -358,8 +358,12 @@ order is not.
 
 **Overlap that is safe:** the architect may begin the data model and backend interfaces while the UX
 audit runs, since audit findings land on the interface, not the schema — then incorporate them
-before declaring `interfaces.md` final. Declare the overlap in the run record so a reader knows the
-audit was still open when the schema was drafted.
+before declaring `interfaces.md` final. QA may begin authoring the test plan the moment the UX audit
+passes, running concurrently with the architect: the plan's edge-case and acceptance-criteria cases
+need only product and design, and only its architecture-derived cases (partial failure, error codes)
+need `interfaces.md`, which QA folds in once it lands, before the plan goes to review. Declare the
+overlap in the run record in both cases, so a reader knows what was still open when the drafting
+started.
 
 **Barriers that must stay:** anything in section 9's hazard list, functional QA before UI QA, a
 reviewer re-verifying after a fix, and the release gate last and alone. Removing those buys minutes

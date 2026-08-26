@@ -86,6 +86,10 @@ Rules for the sequence:
   `run_complete` after (protocol 3a). That pairing is the only thing that tells a later session which
   runs finished, so never skip it for a phase you expect to be quick.
 - **Stop at a failed gate.** Never run a downstream phase on a failed upstream gate.
+- **Phase 6 authoring overlaps phase 5.** QA can start the test plan the moment phase 4 (ux-audit)
+  passes — its edge-case and acceptance-criteria cases need only product and design, not
+  architecture. Launch it alongside phase 5 rather than after it, and have it fold in the
+  architecture-derived cases once `interfaces.md` lands, before moving to review.
 - **Phase 6 is a loop, not a single call.** QA authors the plan, then the architect and product
   owner review it **in parallel** (independent lenses — launch them together), then QA revises
   and confirms each finding. Only an `approved` plan unlocks implementation. Do not let

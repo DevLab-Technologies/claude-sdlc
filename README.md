@@ -122,6 +122,10 @@ for places that claimed to parallelize but didn't:
 - **Contract drafting fans out per boundary** in a multi-repo program, instead of one steward pass
   drafting `backend-api`, then `events`, then `webhooks` in sequence — unless one boundary's shape
   genuinely depends on another's.
+- **Test-plan authoring overlaps architecture.** Most of the plan — cases from acceptance criteria
+  and the edge-case checklist — needs only product and design; only the failure-mode and error-code
+  cases need `interfaces.md`. QA starts the moment the UX audit passes and folds in the
+  architecture-derived cases once they land, rather than waiting for the whole architecture phase.
 - **Five review lenses at once**, bracketed by a lead that runs the build and suite **once** so five
   agents do not collide on ports and fixtures — split further into a fast stage (build, type check)
   that gates the fan-out and a slow stage (the suite) that runs *alongside* the four lenses that never
@@ -210,6 +214,14 @@ checklists living in the one agent that uses them rather than being loaded by al
 mechanical sub-steps run on a cheaper model while every judgment role stays on the default;
 reports are findings-first with no preamble or methodology, which saves tokens writing them and
 again when the lead reads five; and cycle 2 onward reviews the delta, not the whole feature.
+
+**Two overlaps considered and rejected**, for honesty about where the limit is: reviewing a task the
+moment its implementer finishes, while other tasks in the same cycle are still being built, was
+rejected — the build and type check need the whole diff present, and a task reviewed against code
+that will still change produces a verdict about a state that never shipped. Starting the PRD before
+research lands was rejected too — unlike the file-level separations above, a good PRD's non-goals and
+NFRs draw substantively on `constraints.md` and `prior-art.md`, so writing it blind and revising
+later costs more rework than the overlap would save.
 
 **Latency is barriers, not slow agents.** Wall-clock time is the sum of the slowest step in each
 phase, so the wins come from removing waits:
