@@ -543,7 +543,7 @@
     main { flex-direction: column; }
 
     header { gap: 10px; padding: 8px 12px; }
-    .brand { margin-right: 0; }
+    .brand { margin-right: 0; flex: 1 1 100%; min-width: 0; }
     .gate-rail { order: 3; flex: 1 0 100%; }
     .cycle-badge { margin-left: auto; }
 
@@ -555,14 +555,15 @@
       -webkit-overflow-scrolling: touch;
     }
 
-    /* min-width keeps the desks readable (the floor pans instead of shrinking);
-       the height cap stops that width from claiming the whole screen and
-       squeezing the feed into a sliver. */
+    /* Width is derived, never pinned: a min-width plus a definite height would
+       both be honoured and aspect-ratio dropped, stretching the pixel art. The
+       floor takes the wider of the box it is in and the width its height cap
+       implies (34dvh x 8/5), so it fills a tablet row and pans on a phone,
+       always at 8:5. */
     canvas#floor {
-      min-width: 560px;
-      max-height: 34dvh;
-      width: auto;
-      height: 34dvh;
+      width: max(100%, calc(34dvh * 8 / 5));
+      height: auto;
+      max-height: none;
       aspect-ratio: 8 / 5;
     }
 
@@ -587,7 +588,6 @@
 
     /* The brand tag carries a long status string; let it truncate rather than
        push the cycle badge off the edge. */
-    .brand { flex: 1 1 100%; min-width: 0; }
     .brand .tag {
       overflow: hidden;
       text-overflow: ellipsis;
@@ -624,7 +624,15 @@
     /* Fit the height instead of holding the portrait min-width: a floor wider
        than its box centres itself out of view in a flex container, and there is
        no vertical room to spare here anyway. */
-    canvas#floor { min-width: 0; width: auto; height: 100%; max-height: 100%; }
+    canvas#floor { width: auto; height: 100%; max-height: 100%; }
+    /* Brand, rail and badge share one header row here: each wrapping to its own
+       row costs a third of the viewport in the one orientation with no height
+       to spare. The rail scrolls inside its share of the row. */
+    .brand { flex: 0 1 auto; max-width: 40%; min-width: 0; margin-right: 8px; }
+    /* basis 0, not auto: the rail's content is far wider than the row, so an
+       auto basis makes it wrap instead of shrinking and scrolling in place. */
+    .gate-rail { order: 0; flex: 1 1 0; min-width: 0; }
+    .cycle-badge { margin-left: 0; }
     .floor-caption { position: absolute; left: 12px; bottom: 12px; margin-top: 0; max-width: 55%; }
     aside { flex: 1 1 40%; min-height: 0; min-width: 220px;
             border-top: none; border-left: 1px solid var(--panel-line); }
