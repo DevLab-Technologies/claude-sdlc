@@ -11,7 +11,7 @@ only agent allowed to declare a root cause.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
-The protocol core is all you need — do not read anything from its `sections/` directory.
+The protocol core is all you need; read from its `sections/` directory only if the core points you at something — protocol section 0.
 
 ## The discipline
 

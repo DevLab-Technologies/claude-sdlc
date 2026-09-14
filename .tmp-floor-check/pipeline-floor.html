@@ -590,6 +590,7 @@
   </div>
 </div>
 
+<script>window.FLOOR_STATE = {"slug":"demo","empty":false,"generatedAt":1789399202883,"firstEventTs":1789084680000,"lastEventTs":1789084950000,"running":false,"shipped":false,"cycle":1,"cyclesClosed":0,"cyclesOpened":0,"wallClockMs":270000,"sumAgentMs":240000,"issues":{"blocker":0,"major":0,"verified":0},"gates":["intake","research","product","design","figma-design","ux-audit","architecture","test-plan","implementation","review","qa","ui-qa","release"],"skippedGates":[],"steps":[{"id":0,"desks":["sdlc-intake"],"real":{"sdlc-intake":240000},"state":"done","phase":"intake","cycle":1,"gate":"intake","gateState":"done","ticker":[["start","intake","phase_start",1789084680000],["done","intake","run_complete — brief scoped",1789084920000],["done","intake","gate_passed",1789084950000]],"current":"\u003cspan class=\"who\">intake\u003c/span> — intake","signoff":null,"live":false,"dur":1994,"issuesAt":{"blocker":0,"major":0,"verified":0},"startedAt":1789084680000,"endedAt":1789084920000,"caption":"intake in intake."}],"gaps":[]};</script>
 <script>
 (function () {
   "use strict";
@@ -855,10 +856,9 @@
       '<span class="m"><span class="agent">' + who + '</span> ' + text + '</span>';
     tickerEl.appendChild(row);
     tickerEl.scrollTop = tickerEl.scrollHeight;
-    // A divider always precedes the rows it labels, so trimming from the head
-    // can drop one; the rows that survive simply carry no day label, which is
-    // what the feed did before day labels existed.
     while (tickerEl.children.length > 60) tickerEl.removeChild(tickerEl.firstChild);
+    // A divider left at the head after trimming labels nothing; drop it.
+    while (tickerEl.firstChild && tickerEl.firstChild.className === "ticker-day") tickerEl.removeChild(tickerEl.firstChild);
   }
 
   function setGate(name, cls) {

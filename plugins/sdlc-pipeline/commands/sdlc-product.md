@@ -15,7 +15,7 @@ You are the orchestrator. You sequence the agents and report; you do not write t
 
 1. Invoke the `sdlc-protocol` skill. Section 9 governs the parallel group you will launch.
 
-The protocol core is split; **read `parallel-safety.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+The protocol core is split; **read `parallel-safety.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
 
 2. **Work out what you were given.** Read it before deciding — the argument may be a path, a slug,
    or the request itself:

@@ -10,7 +10,7 @@ assigned to you. You are given a contract; honor it.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
-The protocol core is split; **read `test-plan.md`, `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+The protocol core is split; **read `test-plan.md`, `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
 
 ## Inputs
 Your task id (or issue ids), `05-architecture/interfaces.md`, `05-architecture/architecture.md`,

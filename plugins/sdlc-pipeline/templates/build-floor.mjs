@@ -461,17 +461,20 @@ function buildState(root, slug) {
     for (const run of cluster) {
       const who = shortName(run.agent, deskFor(run, counter));
       if (!who) continue;
-      ticker.push(["start", who, "phase_start"]);
+      // The fourth element is the event's own epoch ms. The feed renders that,
+      // not the clock at render time — a replay of last week's run must read
+      // back last week's timestamps.
+      ticker.push(["start", who, "phase_start", run.start]);
       if (!run.running) {
         const tail = run.artifacts.length ? " → " + run.artifacts.join(", ") : "";
         const kind = (gateEvent?.event === "gate_failed" || blocker) ? "bad" : "done";
-        ticker.push([kind, who, "run_complete" + tail + (run.summary ? " — " + run.summary : "")]);
+        ticker.push([kind, who, "run_complete" + tail + (run.summary ? " — " + run.summary : ""), run.end]);
       }
     }
     if (gateEvent) {
       const who = shortName(gateEvent.agent, gateEvent.agent);
       if (who) ticker.push([gateEvent.event === "gate_failed" ? "bad" : "done", who,
-        gateEvent.event + (gateEvent.summary ? " — " + gateEvent.summary : "")]);
+        gateEvent.event + (gateEvent.summary ? " — " + gateEvent.summary : ""), gateEvent._t]);
     }
 
     // Sign-off: the run file whose own timestamp falls inside this run's window.
@@ -537,7 +540,7 @@ function buildState(root, slug) {
       phase: gate, cycle: g.cycle ?? 1, gate,
       gateState: g.event === "gate_failed" ? "bad" : "done",
       ticker: [[g.event === "gate_failed" ? "bad" : "done", shortName(g.agent, g.agent) || "gate",
-        g.event + (g.summary ? " — " + g.summary : "")]],
+        g.event + (g.summary ? " — " + g.summary : ""), g._t]],
       current: `<span class="who">${gate}</span> — ${g.event.replace("_", " ")}`,
       signoff: null, live: false, dur: 900, issuesAt: tallyAt(events, g._t, issueMeta),
       startedAt: g._t, endedAt: g._t,

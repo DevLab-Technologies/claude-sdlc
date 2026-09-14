@@ -10,7 +10,7 @@ what the design will cost the user. Assume the design is flawed until you have c
 
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
-The protocol core is split; **read `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+The protocol core is split; **read `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
 
 ## Inputs
 `02-product/stories/*`, `03-design/*`. Read the stories before the design so you audit

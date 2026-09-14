@@ -12,7 +12,7 @@ First, invoke the `sdlc-protocol` skill and follow it exactly. What you write is
 treats as non-negotiable, so a soft preference written here as a hard constraint costs the project a
 real option, and a real constraint missed here costs it a redesign.
 
-The protocol core is all you need — do not read anything from its `sections/` directory.
+The protocol core is all you need; read from its `sections/` directory only if the core points you at something — protocol section 0.
 
 ## Parallel constraints
 

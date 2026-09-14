@@ -12,7 +12,7 @@ Four repos that each pass their own tests can still be broken together. That gap
 
 First, invoke the `sdlc-protocol` skill and follow it exactly. Section 12 governs programs.
 
-The protocol core is split; **read `multi-repo.md`, `test-plan.md`, `termination.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+The protocol core is split; **read `multi-repo.md`, `test-plan.md`, `termination.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
 
 ## Inputs
 `participants.json`, every `05-architecture/contracts/<boundary>/v<N>.md` with `status: published`,

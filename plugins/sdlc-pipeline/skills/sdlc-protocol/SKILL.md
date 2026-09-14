@@ -30,8 +30,13 @@ reference to "section 9" means the same thing it always did.
 | 12 | `multi-repo.md` | the work spans more than one repository |
 
 **Read the ones your agent definition names, in a single batch, before you start work** — not one at
-a time as you hit them. Do not read a section you were not pointed at: loading all of them costs more
-than the undivided file did.
+a time as you hit them. Do not go browsing the rest: loading all of them costs more than the
+undivided file did.
+
+That list is a default, not a wall. **If the core points you at a section you were not granted, or
+you find you genuinely need one to do your job, read it and note in your run record which section and
+why** — a protocol you had to guess at is worse than a slightly more expensive read. Those notes are
+how a missing grant gets found and fixed.
 
 ## 1. Workspace layout
 
@@ -160,8 +165,12 @@ workspace is designed so the next session can tell exactly where it stopped and 
 2. **Mark your artifacts complete, last.** Every artifact you write carries `status: partial` in its
    frontmatter from the moment you create it, flipped to `status: complete` in your final write. A
    file without `status: complete` is **untrusted** — it may be half a thought.
-3. **Update `state.json` as your very last action**, in one write. A gate therefore never claims
-   `passed` for work that did not finish.
+3. **If you own the phase, update `state.json` as your very last action**, in one write. A gate
+   therefore never claims `passed` for work that did not finish. **If you are one of several agents
+   running concurrently in a phase, you do not own it: write your own artifacts and touch neither
+   `state.json` nor any gate.** Exactly one agent per phase writes state — the synthesizer where the
+   group has one, otherwise the orchestrator. Concurrent writers silently overwrite each other, and
+   the surviving write decides the gate.
 
 Those three rules are all any agent needs. The procedure for **recovering** an interrupted run — what
 each signal means, what to quarantine, what to re-run — is `sections/resume.md`, and belongs to

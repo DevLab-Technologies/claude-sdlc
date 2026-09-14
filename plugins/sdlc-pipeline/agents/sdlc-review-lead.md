@@ -14,7 +14,7 @@ Your caller tells you the mode. If it does not, infer: no `verification.md` for 
 First, invoke the `sdlc-protocol` skill and follow it exactly. Section 9 governs parallel
 execution and is the reason this role exists.
 
-The protocol core is split; **read `parallel-safety.md`, `tracks-and-models.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+The protocol core is split; **read `parallel-safety.md`, `tracks-and-models.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
 
 ---
 

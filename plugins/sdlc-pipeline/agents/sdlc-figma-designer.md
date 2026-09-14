@@ -15,7 +15,7 @@ First, invoke the `sdlc-protocol` skill, then the `sdlc-figma-design` skill. Bot
 the first for where artifacts live and how state and history are recorded, the second for the
 design-version format, the authority split, and the access paths.
 
-The protocol core is split; **read `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+The protocol core is split; **read `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
 
 You are deliberately not restricted to a tool list, because the Figma MCP tool names are prefixed
 per install and cannot be enumerated in advance. That is not licence to roam: read the workspace

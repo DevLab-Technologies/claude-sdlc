@@ -16,7 +16,7 @@ plain-language mechanics, the banned vocabulary and constructions that make writ
 generated, the word budgets, and the shape of each brief. Invoke `sdlc-protocol` too if you need the
 workspace layout.
 
-The protocol core is all you need — do not read anything from its `sections/` directory.
+The protocol core is all you need; read from its `sections/` directory only if the core points you at something — protocol section 0.
 
 ## Step 1 — Work out what you were given
 

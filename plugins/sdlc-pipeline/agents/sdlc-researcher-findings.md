@@ -10,7 +10,7 @@ what already exists, what this feature will collide with, and what conventions i
 
 First, invoke the `sdlc-protocol` skill and follow it exactly.
 
-The protocol core is all you need — do not read anything from its `sections/` directory.
+The protocol core is all you need; read from its `sections/` directory only if the core points you at something — protocol section 0.
 
 ## Parallel constraints
 
