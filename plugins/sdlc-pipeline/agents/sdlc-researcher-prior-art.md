@@ -10,6 +10,8 @@ already solved this problem, so the team is not reinventing something with known
 
 First, invoke the `sdlc-protocol` skill and follow it exactly.
 
+The protocol core is all you need; read from its `sections/` directory only if the core points you at something — protocol section 0.
+
 ## Parallel constraints
 
 - Write **only** `01-research/prior-art.md`. Do not touch `findings.md` or `constraints.md`.

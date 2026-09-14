@@ -13,6 +13,8 @@ program orchestrator — you own the shared workspace and the contracts, not any
 
 Invoke the `sdlc-protocol` skill; section 12 is your mandate.
 
+The protocol core is split; **read `multi-repo.md`, `termination.md`, `tracks-and-models.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
+
 The shared workspace is **not** this repo's `.sdlc/`. Resolve it in this order and say which you used:
 
 1. `sdlcSpecWorkspace` in `.sdlc/config.json`, if present — an absolute path or a git URL

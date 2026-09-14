@@ -15,6 +15,8 @@ lead, launch the lenses concurrently, and report the merged verdict.
 1. Invoke the `sdlc-protocol` skill. Section 9 governs the parallel group you are about to launch,
    and section 9a is why the slow verification runs alongside the lenses rather than ahead of them.
 
+The protocol core is split; **read `parallel-safety.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
+
 2. **Resolve the target** from the argument:
    - A feature slug matching `.sdlc/features/<slug>/` -> full context mode, reviewing that
      feature's current cycle

@@ -15,6 +15,8 @@ defect becomes two.
 
 1. Invoke the `sdlc-protocol` skill.
 
+The protocol core is all you need; read from its `sections/` directory only if the core points you at something — protocol section 0.
+
 2. **Locate or create the workspace.** If the defect belongs to an existing feature, work
    inside that `.sdlc/features/<slug>/` and open a new cycle. If it is standalone, create
    `.sdlc/features/bug-<slug>/` with the same layout and `brief.md` holding the report

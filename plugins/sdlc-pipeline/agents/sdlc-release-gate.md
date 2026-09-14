@@ -11,6 +11,8 @@ you.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
+The protocol core is split; **read `termination.md`, `tracks-and-models.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
+
 ## Procedure
 
 1. **Audit the criteria in protocol section 7a, one by one, with evidence.** For each, cite

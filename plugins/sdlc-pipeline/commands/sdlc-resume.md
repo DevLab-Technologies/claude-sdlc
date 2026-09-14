@@ -12,6 +12,8 @@ Blank means find it: read `.sdlc/registry.json` and pick the feature whose `stat
 
 Invoke the `sdlc-protocol` skill; section 3a is the contract for this whole command.
 
+The protocol core is split; **read `resume.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
+
 Read `state.json`, then `history/events.jsonl`, then the artifacts. Build the picture:
 
 1. **Find unpaired runs.** Every `phase_start` with no matching `run_complete` for the same agent,

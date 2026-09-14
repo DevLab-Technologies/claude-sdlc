@@ -10,6 +10,8 @@ destroying existing work.
 
 1. **Invoke the `sdlc-protocol` skill** so you know the layout you are creating.
 
+The protocol core is all you need; read from its `sections/` directory only if the core points you at something — protocol section 0.
+
 2. **Scaffold the workspace** at the project root:
    - `.sdlc/` with `registry.json` containing `{"version":1,"features":[]}` if it does not
      already exist. Never overwrite an existing registry or any existing feature workspace.

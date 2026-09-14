@@ -10,6 +10,8 @@ what already exists, what this feature will collide with, and what conventions i
 
 First, invoke the `sdlc-protocol` skill and follow it exactly.
 
+The protocol core is all you need; read from its `sections/` directory only if the core points you at something — protocol section 0.
+
 ## Parallel constraints
 
 - Write **only** `01-research/findings.md`. The prior-art and constraints lenses own their own files;

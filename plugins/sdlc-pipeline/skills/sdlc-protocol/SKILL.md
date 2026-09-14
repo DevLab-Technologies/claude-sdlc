@@ -9,8 +9,34 @@ Agents never talk to each other directly. They communicate **only** through the 
 disk: read your inputs, write your outputs, append to history, update state. That is what makes the
 pipeline resumable and auditable across sessions.
 
-This file is the shared core. Role-specific detail lives in the agent that owns it — your own agent
-definition carries the checklists and formats for your job.
+This file is the shared core — sections 1 to 7, 10 and 11. **Every agent loads it, on every turn of
+its run, so it stays short on purpose.** Role-specific detail lives in the agent that owns it: your
+own agent definition carries the checklists and formats for your job.
+
+## 0. Sections held outside the core
+
+The remaining numbered sections live in their own files under
+`${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/`. They keep their original numbers, so a
+reference to "section 9" means the same thing it always did.
+
+| § | File | Load it if |
+|---|---|---|
+| 2a | `design-authority.md` | you read or write design artifacts, or build a user-facing surface |
+| 3a | `resume.md` | you are recovering an interrupted run (`/sdlc-resume`, or the orchestrator reconciling state) |
+| 4a | `test-plan.md` | you author, review, amend, or implement test cases |
+| 7a | `termination.md` | you decide whether the feature is done (`sdlc-release-gate`, the orchestrator) |
+| 8 | `tracks-and-models.md` | you pick the track or the model for a phase — orchestrator only |
+| 9, 9a | `parallel-safety.md` | you launch a parallel group, or you are a member of one |
+| 12 | `multi-repo.md` | the work spans more than one repository |
+
+**Read the ones your agent definition names, in a single batch, before you start work** — not one at
+a time as you hit them. Do not go browsing the rest: loading all of them costs more than the
+undivided file did.
+
+That list is a default, not a wall. **If the core points you at a section you were not granted, or
+you find you genuinely need one to do your job, read it and note in your run record which section and
+why** — a protocol you had to guess at is worse than a slightly more expensive read. Those notes are
+how a missing grant gets found and fixed.
 
 ## 1. Workspace layout
 
@@ -48,18 +74,12 @@ Paths are relative to the repo root. Write only inside your own phase directory 
 `/sdlc-digest`, which owns `digest/`, and `/sdlc-visualize`, which owns `floor/` — neither writes
 anywhere else in the workspace.
 
-`digest/` and `floor/` are both derived, human-facing, and owned by nobody but their generating
-command: short briefs from `/sdlc-digest`, an animated replay of `history/events.jsonl` from
-`/sdlc-visualize`. Neither affects a gate, neither is read as input by any agent, and deleting either
-costs nothing but regeneration. Never digest a digest, and never let a brief or a replay stand in for
-the artifact it summarizes — `floor/pipeline-floor.html` is a replay ending at the last event in the
-log when it was generated, never a live view, and must be presented as one.
-
-**Both are outside 3a.** The interruption machinery below does not apply to either: output left
-`partial` by a killed session is regenerated on the next run of its command, never quarantined, and
-never reported as an interrupted run. Neither has an owning agent to re-run and neither logs events,
-so treating either as pipeline output sends the recovery path looking for something that was never
-there. Every scan for unpaired runs or partial artifacts skips both directories.
+`digest/` and `floor/` are derived, human-facing, and owned by nobody but their generating command.
+Neither affects a gate, neither is read as input by any agent, and deleting either costs nothing but
+regeneration. **Both are outside 3a**: output left `partial` by a killed session is regenerated on
+the next run of its command, never quarantined, and never reported as an interrupted run — so every
+scan for unpaired runs or partial artifacts skips both directories. The rules for generating them
+live in `/sdlc-digest` and `/sdlc-visualize`.
 
 Standalone runs with no feature behind them go to `.sdlc/reviews/<date>-<target>/`,
 `.sdlc/product/<date>-<slug>/`, or `.sdlc/design/<date>-<slug>/` for a design version with no
@@ -85,39 +105,12 @@ feature attached — same layouts, no gate to set.
 
 Gates: `pending` | `passed` | `failed` | `skipped`. A `skipped` gate needs a recorded reason.
 Status: `in_progress` | `awaiting_human` | `blocked` | `ready_to_ship` | `shipped`.
-Track: `trivial` | `small` | `standard` | `large` — see section 8.
+Track: `trivial` | `small` | `standard` | `large` — see section 8, `sections/tracks-and-models.md`.
 `design_version`: the published Figma design version number, or `null` when there is none — see
-section 2a and the `sdlc-figma-design` skill.
+section 2a (`sections/design-authority.md`) and the `sdlc-figma-design` skill.
 
 Read it before you start; update it as your **last** action, in one write. Never reset another
 phase's gate; only the orchestrator does that when opening a cycle.
-
-## 2a. Two design artifacts, one authority split
-
-A feature may carry a Figma design as well as the markdown design specification. The full contract
-is the `sdlc-figma-design` skill; three rules matter to every agent, whether or not it ever opens
-Figma.
-
-1. **Only `sdlc-figma-designer` talks to Figma.** It exports what it read into
-   `03b-figma/v<N>/` — extracted per-screen specs, reference renders, tokens, and a Figma-to-code
-   component mapping. Every other agent reads those files. Nobody else needs Figma access, and no
-   phase blocks on Figma being reachable.
-2. **Implement against a `published` version, never a `draft` and never the live file.** Versions
-   are immutable once published; a change is `v<N+1>`. `state.json` -> `design_version` names the
-   current one, or `null`.
-3. **Authority splits by kind of question.** Visual properties — layout, spacing, type scale,
-   color, radius, elevation, component composition — follow the published design version when one
-   exists. Behavioral properties — which states exist, validation, copy strings, focus order,
-   accessibility semantics, analytics — follow `03-design/*.md`, always, because that is what the
-   UX audit ran against. With no published version, `03-design/*.md` governs everything.
-
-Where the two disagree inside one column, that is a `major` defect: follow `03-design/*.md`, open an
-issue naming both files and both values, and bus `sdlc-ux-designer`. Never split the difference.
-
-**A newly published design version makes later sign-offs stale**, exactly as a code change does
-(section 7): a `review`, `qa`, or `ui-qa` pass recorded before the publish no longer covers the
-current design, and those gates re-run in the current cycle. Gate key `figma-design`; `skipped` with
-a recorded reason when there is no Figma, no access, or no user-facing surface.
 
 ## 3. History — append-only, never rewritten
 
@@ -172,30 +165,16 @@ workspace is designed so the next session can tell exactly where it stopped and 
 2. **Mark your artifacts complete, last.** Every artifact you write carries `status: partial` in its
    frontmatter from the moment you create it, flipped to `status: complete` in your final write. A
    file without `status: complete` is **untrusted** — it may be half a thought.
-3. **Update `state.json` as your very last action**, in one write. A gate therefore never claims
-   `passed` for work that did not finish.
+3. **If you own the phase, update `state.json` as your very last action**, in one write. A gate
+   therefore never claims `passed` for work that did not finish. **If you are one of several agents
+   running concurrently in a phase, you do not own it: write your own artifacts and touch neither
+   `state.json` nor any gate.** Exactly one agent per phase writes state — the synthesizer where the
+   group has one, otherwise the orchestrator. Concurrent writers silently overwrite each other, and
+   the surviving write decides the gate.
 
-**Resuming.** Read `state.json` for position, then reconcile against the event log:
-
-| Signal | Meaning | Action |
-|---|---|---|
-| `phase_start` with no `run_complete` | that agent was interrupted | discard its artifacts and re-run it |
-| Artifact without `status: complete` | partial output | discard and re-run its owner |
-| Gate `pending`, artifacts present and complete | the agent finished but state was not written | verify the artifacts, then set the gate |
-| Parallel group with some members unpaired | only those members were interrupted | re-run **only** those; completed reports stand |
-| Working tree has edits not listed in a `## Fixed inline` section | the lead was interrupted mid-fix | inspect the diff, then either record or revert those edits before continuing |
-
-Discard means move it aside, not delete it: rename to `<name>.interrupted-<ts>.md` so the evidence
-survives. A partial report can still show what an interrupted agent was seeing.
-
-**Never resume by assuming.** If the log and the artifacts disagree, say so and reconcile from the
-artifacts — they are the work; state is a claim about the work. Report what you discarded and why
-rather than silently redoing it, because a re-run that quietly replaces a different conclusion is
-how an interruption becomes a wrong verdict.
-
-**Idempotence.** Re-running an interrupted agent must revise its output in place for that cycle, not
-append a second copy. Numbered artifacts already allocated — `ISSUE-011`, `INV-004`, `TC-014` — keep
-their numbers; never reuse a number for different content.
+Those three rules are all any agent needs. The procedure for **recovering** an interrupted run — what
+each signal means, what to quarantine, what to re-run — is `sections/resume.md`, and belongs to
+`/sdlc-resume` and the orchestrator. Do not attempt recovery from inside a phase agent.
 
 ## 4. Issues
 
@@ -239,33 +218,6 @@ unproven, intermittent, a regression, a crash, a security finding, or twice-reop
 `sdlc-debugger` **first**; contract violation -> architect decides; the spec is wrong -> product
 owner or designer, not a code fix. Issues sharing one root cause are **one** fix, cross-linked.
 Every blocker/major fix ships a regression test that fails before it and passes after.
-
-## 4a. The test plan — a contract written before the code
-
-`06-test-plan/plan.md` specifies the tests **before** implementation, authored by QA independently,
-reviewed by the architect (technical gaps, wrong levels) and the product owner (uncovered criteria,
-wrong expectations). Only an `approved` plan unlocks implementation. An implementer deriving its own
-cases tests what it built rather than what was asked.
-
-Header: `status: draft | in_review | approved | amended`, `cycle_approved`, `cases`.
-One row per case:
-
-| id | story | ac | level | type | owner | expected | test_file | status |
-|---|---|---|---|---|---|---|---|---|
-| TC-014 | STORY-003 | AC-2 | unit | negative | backend | single non-enumerating error, field cleared | — | planned |
-
-`level`: `unit` | `integration` | `e2e` | `manual` (manual needs a stated reason).
-`type`: `happy` | `boundary` | `negative` | `error` | `concurrency` | `security` | `performance` |
-`a11y` | `regression`. `owner`: the implementer role, or `qa`.
-`status`: `planned` -> `implemented` -> `passing` | `failing` | `not_run` | `withdrawn`.
-
-Implementers fill `test_file` with `path::test name` and reference the `TC` id in the test so
-traceability survives refactors. An implementer who thinks a case is wrong buses QA — never
-silently drops it or weakens its assertion.
-
-**Amendment, never quiet editing.** New cases are appended with a reason, the header goes to
-`amended`, and a `test_plan_amended` event is logged. Cases are never deleted; an invalid one is
-`withdrawn` with a rationale. The authoring checklist lives in `sdlc-qa-functional`.
 
 ## 5. The bus — directed questions
 
@@ -318,121 +270,6 @@ sign-off is scoped to its own gate. **Only `sdlc-release-gate` declares ship-rea
 auditing the others — rejecting any made stale by later changes, and any covering work its author
 changed beyond mechanical fixes. Never state or imply ship-readiness outside your scope.
 
-## 7a. The cycle, and when the work is done
-
-A **cycle** is one pass of implement -> review -> QA -> UI QA. Findings become issues. The
-orchestrator opens cycle `n+1` when any of those gates failed, resetting only those gates.
-
-The feature reaches `ready_to_ship` only when **all** of these hold. Each needs a file that proves
-it — "probably fine" is a fail:
-
-1. Zero `open` or `fixing` issues at `blocker` or `major`.
-2. `review`, `qa`, and `ui-qa` are each `passed`, or `skipped` with a reason the **track** justifies,
-   **in the current cycle**. A pass from cycle 1 does not carry forward past later changes, and a
-   skip justified by expedience rather than the track is a fail.
-3. Every story in `02-product/backlog.md` maps to at least one verified QA result — unless the track
-   declared no test plan, which must be recorded.
-4. Every `blocking: true` bus message is `answered`.
-5. `minor` and `nit` issues are fixed or explicitly `deferred` with a rationale, and every deferral
-   is listed in the release record. Deferred work nobody can see is just hidden work.
-6. Every fixed `blocker`/`major` has a named regression test, and every one that needed a debugger
-   has a linked `INV` with a proven root cause.
-7. No issue sits in `investigating` or `fixing`.
-8. `06-test-plan/plan.md` holds no case still `planned` or `implemented` — those mean the suite was
-   never fully run.
-9. No sign-off was made stale by a later code change, and nobody signed off on work they authored
-   beyond mechanical fixes.
-10. If `design_version` is set, no `review`, `qa`, or `ui-qa` pass predates the publish of that
-   version, and the implementation was built against it rather than a superseded one.
-
-**Escalation instead of spinning.** If `cycle > max_cycles`, or the same issue has reopened in three
-cycles, or a contradiction exists that only a human can resolve — conflicting requirements, an
-assumption proven wrong, scope unreachable under the constraints — do not open another cycle. Set
-`status: blocked`, append `escalated`, and write `history/ESCALATION.md`: what keeps failing, the
-root cause as best it is known, and two or three concrete options with their trade-offs.
-
-Never pass a gate to end a loop. A pipeline that is honestly stuck is a useful result; a green light
-nobody earned is the expensive failure.
-
-## 8. Scaling to the change — do not pay standard cost for a trivial change
-
-The full pipeline is built for a feature. Running all of it on a copy change wastes time and money
-without buying quality. The orchestrator picks a `track` and records it in `state.json`:
-
-| Track | Fits | Phases | Review lenses |
-|---|---|---|---|
-| `trivial` | copy, config, a constant, a dependency bump | intake -> implement -> review -> release | correctness only |
-| `small` | one contained change, no new surface or data | intake, product (stories only), test-plan, implement, review, qa | correctness + the one lens the change touches |
-| `standard` | a normal feature | all phases | all five |
-| `large` | new subsystem, migration, or auth/payment/data-model change | all phases, `max_cycles` raised | all five, plus a second security pass |
-
-Two rules that keep this from becoming a quality hole:
-- **Escalate freely, never silently downgrade.** Any agent that finds the track too small for what
-  it is seeing says so and the orchestrator re-tracks upward. Discovering a change touches auth
-  means it was never `trivial`.
-- **Security and data integrity never get skipped by track.** A `trivial` change to an
-  authorization check, a payment path, a migration, or anything handling personal data is
-  `standard` at minimum, regardless of diff size.
-
-## 9. Parallel safety
-
-Agents run concurrently where work is independent. Four hazards, four rules:
-
-1. **Id races** — parallel agents **never allocate global ids**. Emit local prefixed findings
-   (`CORR-1`, `SEC-3`, `PERF-2`, `TEST-5`, `ARCH-1`, `PROD-4`, `BIZ-2`); a single synthesizer
-   assigns `ISSUE-<NNN>` afterward and records the mapping.
-2. **Concurrent edits** — only **one** agent edits per phase. Parallel members propose fixes and
-   never apply them.
-3. **Shared runtime** — build, suite, server, and fixtures are exercised **once**, before the
-   fan-out, into a file the group reads. No parallel member starts a server or runs the suite. Need
-   a measurement nobody took? Record it in `## Not covered`.
-4. **Shared state** — only the phase's owning agent touches `state.json` and gates.
-
-Each parallel agent writes exactly **one** file, named for its lens, and reads freely. If two could
-write the same path, split the path — there is no locking.
-
-A member that fails or returns nothing is recorded as **not run**. An unexamined angle is not a
-clean angle, and no sign-off may imply otherwise.
-
-## 9a. Pipelining — latency is barriers, not slow agents
-
-Wall-clock time is the sum of the slowest step in each phase, so the wins come from removing
-barriers, not from hurrying anyone. Overlap only where the dependency is not real.
-
-**Split the verification gate.** Build and type check answer "is this reviewable" and take seconds.
-The test suite and smoke test take minutes and only the **tests** lens needs their output. So:
-
-1. **Verify-fast** — build, type check, and the diff scope. If it fails, stop: nobody reviews code
-   that does not compile. This is the only thing on the critical path before the fan-out.
-2. **Concurrently** — the suite and smoke test (verify-slow) run alongside the four **static** lenses
-   (correctness, security, performance, compliance), which read source and need no runtime facts.
-3. **The tests lens** starts when verify-slow lands, since it compares results against the plan.
-4. **Synthesize** once all of it is in.
-
-That takes the slow suite off the critical path for four of five lenses without changing what any
-of them examines. Two constraints keep it honest: static lenses read **source**, never build output,
-which may be mid-rewrite while the suite runs; and the claim check — implementer claims versus
-observed results — stays with the lead in verify-slow, where the evidence is.
-
-**Real dependency or incidental?** A dependency created by how work was decomposed is not a real
-dependency. The architect should prefer decompositions that maximize the `parallel_with` sets, and
-where a task ordering exists only because of how the work was carved up, say so and re-carve it.
-Two tasks touching one file is a real conflict; two tasks the same person would naturally do in
-order is not.
-
-**Overlap that is safe:** the architect may begin the data model and backend interfaces while the UX
-audit runs, since audit findings land on the interface, not the schema — then incorporate them
-before declaring `interfaces.md` final. QA may begin authoring the test plan the moment the UX audit
-passes, running concurrently with the architect: the plan's edge-case and acceptance-criteria cases
-need only product and design, and only its architecture-derived cases (partial failure, error codes)
-need `interfaces.md`, which QA folds in once it lands, before the plan goes to review. Declare the
-overlap in the run record in both cases, so a reader knows what was still open when the drafting
-started.
-
-**Barriers that must stay:** anything in section 9's hazard list, functional QA before UI QA, a
-reviewer re-verifying after a fix, and the release gate last and alone. Removing those buys minutes
-and costs the property the pipeline exists for.
-
 ## 10. Report economy
 
 Long reports cost tokens on the way out and again on the way in when a synthesizer reads five of
@@ -466,124 +303,3 @@ them. Write less, without cutting substance:
 - Bracket every run with `phase_start` and `run_complete`, and put `duration_ms` on the latter
   (section 3). `/sdlc-timing` and every duration a human ever sees comes from this one field.
 - Never mention tooling or AI assistance in any artifact, commit, or document.
-
-## 12. Multi-repo programs
-
-A **program** is one feature spanning several repositories — a backend, an admin, a web frontend, a
-mobile app. The specification is written **once** in a shared workspace; each repository implements
-its own slice against a published contract and keeps its own gates. See ADR-0002 for why.
-
-### Where things live
-
-**Shared workspace** — a dedicated specs repository by default, holding everything written once:
-
-```
-.sdlc/features/<slug>/
-  state.json              # shared position + participant roll-up
-  participants.json       # who is involved, their repos and roles
-  00-intake/ … 04-ux-audit/          # as normal, written once
-  05-architecture/
-    architecture.md  workplan.md  test-strategy.md
-    interfaces.md                    # the cross-boundary contract, in summary
-    contracts/<boundary>/v<N>.md     # versioned, per boundary
-    contracts/<boundary>/CHANGELOG.md
-  06-test-plan/plan.md               # cases tagged with a participant, or `integration`
-  participants/<repo>/
-    tasks.md            # that repo's slice of the workplan and its TC ids
-    contract-ack.md     # which contract version it targets
-    status.md           # its gate roll-up, copied back from the repo
-  12-integration/cycle-<n>/{conformance,journeys,deploy-order,integration-summary}.md
-  issues/ bus/ history/                # spec-level and contract-level only
-```
-
-**Each participating repo** keeps `.sdlc/features/<slug>/` with:
-
-```
-spec-link.md            # shared workspace URL, path, and the commit it was read at
-participants/self.md    # this repo's role, its tasks, its contract version
-07-implementation/ 08-review/ 09-qa/   # its own cycles, its own gates
-issues/                 # defects in THIS repo's code
-```
-
-**Issue routing, and it matters.** A defect in a repo's own code is a **local** issue. Anything about
-the contract, the requirements, the design, or another participant is a **shared** issue in the spec
-workspace, plus a bus message to the owning role. Filing a contract defect locally is how four repos
-end up each working around the same problem.
-
-### Contracts are versioned and published
-
-`05-architecture/contracts/<boundary>/v<N>.md`:
-
-```markdown
----
-boundary: backend-api
-version: 2
-status: draft | published | deprecated
-provider: backend
-consumers: [admin, frontend, mobile]
-supersedes: 1
-breaking: true
-compat_window: v1 honored until 2026-10-01
----
-## Interface        (endpoints, types, error codes, events — exact shapes)
-## Changes from v1
-## Migration required, per consumer
-```
-
-Rules that hold without exception:
-
-- **Consumers implement against `published` versions only, never a `draft`.** A draft is still moving.
-- Publishing is what unblocks consumers. It is the provider's most schedule-critical act, and it does
-  not require the provider's implementation to exist — that is the point.
-- **A breaking change needs**: a version bump, `breaking: true`, a stated compatibility window, a
-  per-consumer migration note, and an acknowledgement from every consumer in
-  `participants/<repo>/contract-ack.md`.
-- Every published change appends to the boundary's `CHANGELOG.md`. Never edit a published version in
-  place — a consumer has already built against those exact words.
-- A provider that needs to change a published contract mid-flight opens a bus message to every
-  affected consumer with the default stated, exactly as protocol 5 requires.
-
-### Awareness is pull, not push
-
-No agent can notify another repository. A repo learns what changed by **reading the shared
-workspace**, so make that cheap and routine:
-
-- `spec-link.md` records the commit the repo last read. Comparing it against the shared workspace's
-  current head is how drift is detected: "contract `v2` published, this repo targets `v1`".
-- Any status check in a participating repo must report that drift. A repo silently building against a
-  superseded contract is the failure mode this whole section exists to prevent.
-- Optionally, a steward may open an issue or PR in each consumer repo when a contract publishes. That
-  is an outward-facing action on someone else's repository: **confirm with a human first**, every
-  time, and never make it automatic.
-
-### Participants run their own cycles
-
-Each repo runs implementation, review, and QA locally with its own conventions, commands, and track.
-A participant's gates are its own. `participants/<repo>/status.md` in the shared workspace is a copy
-of its roll-up so the program can be read from one place; the repo's own `state.json` remains
-authoritative for that repo.
-
-Participants proceed independently once their contract is published. Do not serialize a consumer
-behind a provider's implementation — only behind its **contract**.
-
-### The integration gate
-
-After every participant passes its own gates, and never before, `sdlc-integration-qa` verifies what
-no single repo can:
-
-1. **Conformance, both directions.** Does the provider actually honor the published contract — every
-   field, every error code, every event? And do consumers assume **only** what the contract promises,
-   rather than an undocumented behavior they observed? The second direction is the one teams skip and
-   the one that breaks on the next provider change.
-2. **Cross-repo journeys.** The test plan's `integration` cases, run against all participants
-   together.
-3. **Version alignment.** Every `contract-ack.md` matches a published version, or a compat window
-   covers the lag with a date that has not passed.
-4. **Deploy order**, written to `deploy-order.md`. Expand-contract, always: the provider ships first
-   and backward-compatible, consumers migrate, and the provider removes the old version **last**. Any
-   order requiring simultaneous deployment is a finding — there is no cross-repo atomicity, so an
-   ordering that assumes it will fail in production.
-
-The program reaches `ready_to_ship` only when every participant is individually shippable by section
-7a **and** the integration gate passes in the same round. A participant that regresses after
-integration passed invalidates that pass, exactly as a code change invalidates a stale sign-off.

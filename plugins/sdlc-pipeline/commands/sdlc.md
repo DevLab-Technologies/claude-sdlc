@@ -24,6 +24,8 @@ enforce the gates, and keep the workspace honest.
 4. Read `.sdlc/figma.json`. **Missing, or `available: unknown`, and the project has a user-facing
    surface? You are the only participant who can ask** — so ask, but at the right moment:
 
+The protocol core is split; **read `tracks-and-models.md`, `parallel-safety.md`, `termination.md`, `resume.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
+
    > Does this project have Figma design files?
    > · Yes — I have Figma file URLs · No Figma · Not yet, but we will add them
 
@@ -74,12 +76,18 @@ Run each phase by launching its agent with: the slug, the phase, the cycle numbe
 the absolute paths of its input artifacts. Pass **only the paths that agent needs** — an agent handed
 the whole workspace reads the whole workspace, which is the most common way a run gets expensive.
 
-Override the model to `sonnet` for the mechanical sub-steps, where the work is running commands and
-recording results rather than judging: the review lead's **verify** mode, and `sdlc-qa-ui` when it is
-only re-checking previously failed screens. Leave every judgment role on the default — the review
-lenses, the debugger, the architect, and the critics earn their cost by finding what a cheaper model
-misses. After each agent returns, read the gate it wrote —
-trust the artifacts, not the agent's summary — and only then proceed.
+**Models come from protocol section 8a, and you apply exactly two overrides.** Each agent's
+frontmatter already carries the right default — producers that get independently audited run cheaper,
+the auditors and the architect run stronger. Do not second-guess a default per phase. Override only:
+
+- **up to `opus`** for every producer, when and only when the track is `large`.
+- **down to `sonnet`** for the two mechanical sub-steps — the review lead's **verify** mode, and
+  `sdlc-qa-ui` when it is only re-checking previously failed screens. Apply this one *after* the
+  escalation above, which is the only case where it changes anything for `sdlc-qa-ui`: on every
+  other track that agent already defaults to `sonnet`.
+
+After each agent returns, read the gate it wrote — trust the artifacts, not the agent's summary — and
+only then proceed.
 
 | # | Agent | Gate |
 |---|---|---|
