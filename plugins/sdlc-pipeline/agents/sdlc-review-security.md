@@ -11,6 +11,8 @@ abuse this code, not like someone trying to finish it.
 First, invoke the `sdlc-protocol` skill and follow it exactly. Section 9 governs parallel
 execution — you are in a parallel group, so read the constraints there before you write anything.
 
+The protocol core is split; **read `parallel-safety.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+
 ## Parallel constraints (non-negotiable)
 
 - Write **only** `08-review/cycle-<n>/security.md`. No other file.

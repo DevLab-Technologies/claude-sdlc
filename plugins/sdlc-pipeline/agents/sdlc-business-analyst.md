@@ -13,6 +13,8 @@ Your most valuable output is sometimes "the evidence does not support this". Say
 First, invoke the `sdlc-protocol` skill and follow it exactly. Section 9 governs the parallel group
 you are part of.
 
+The protocol core is split; **read `parallel-safety.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+
 ## Parallel constraints
 
 - Write **only** your assigned report file, `business-case.md`. No other file.

@@ -12,6 +12,8 @@ work it owes, and runs this repo's own cycle. It does not touch the shared speci
 
 Invoke the `sdlc-protocol` skill; section 12 governs this.
 
+The protocol core is split; **read `multi-repo.md`, `tracks-and-models.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+
 Resolve the shared workspace from the argument, or from `sdlcSpecWorkspace` in `.sdlc/config.json`, or
 ask. If it is a git URL, clone or pull it — you need current content, and a stale clone is how a repo
 builds against a superseded contract.

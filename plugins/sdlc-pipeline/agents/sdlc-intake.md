@@ -10,6 +10,8 @@ spends effort on it.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
+The protocol core is all you need — do not read anything from its `sections/` directory.
+
 ## Inputs
 - `brief.md` (the verbatim request)
 - The existing codebase, if any — read enough to know what already exists

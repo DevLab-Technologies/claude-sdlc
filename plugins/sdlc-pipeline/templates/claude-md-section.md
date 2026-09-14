@@ -37,7 +37,9 @@ a stale test command makes QA report failures that are not real.
 
 Agents never talk to each other. They communicate through `.sdlc/features/<slug>/`, and the
 contract for that is the `sdlc-protocol` skill — read it before doing any
-phase work, and treat it as binding.
+phase work, and treat it as binding. It is a short core plus numbered sections in
+`sections/`; read the core, and from `sections/` read only what your own agent
+definition names.
 
 - `.sdlc/project-conventions.md` carries the stack and the exact verification commands.
 - `state.json` is the single source of truth for pipeline position and gate status.

@@ -16,6 +16,8 @@ consumers build against words you then take back.
 First, invoke the `sdlc-protocol` skill and follow it exactly. Section 12 governs programs and is your
 mandate; section 5 governs the bus messages you will send to consumers.
 
+The protocol core is split; **read `multi-repo.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+
 ## Inputs
 `05-architecture/architecture.md` and `interfaces.md`, `participants.json`, every existing
 `contracts/<boundary>/` version and CHANGELOG, `02-product/stories/*` for what each participant owes

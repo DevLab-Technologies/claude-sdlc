@@ -97,7 +97,10 @@ Re-running `/sdlc` on an existing feature resumes it rather than starting over.
 Each feature gets a workspace at `.sdlc/features/<slug>/` holding the artifacts of every phase,
 an append-only `history/events.jsonl`, a full record of every agent run, issues as individual
 files, and `state.json` as the single source of truth for position and gate status. The contract
-for all of it is the `sdlc-protocol` skill, which every agent reads and treats as binding.
+for all of it is the `sdlc-protocol` skill, which every agent reads and treats as binding. Its core
+is short by design, since every agent carries it on every turn; the heavier numbered sections —
+parallel safety, the test plan, tracks and models, multi-repo — sit beside it in `sections/` and are
+loaded only by the agents whose definitions name them.
 
 **Interruption is expected, not exceptional.** Every agent brackets its run in the event log and
 marks its artifacts `status: partial` until a final write flips them to `complete`, and `state.json`
@@ -236,11 +239,21 @@ Two rules stop that becoming a quality hole: escalation is free and always upwar
 finds the track too small says so and it re-tracks — and **security, authorization, payments,
 migrations, and personal data are `standard` at minimum whatever the diff size**.
 
-Other things that keep cost down: the shared protocol is deliberately small, with role-specific
-checklists living in the one agent that uses them rather than being loaded by all of them;
-mechanical sub-steps run on a cheaper model while every judgment role stays on the default;
-reports are findings-first with no preamble or methodology, which saves tokens writing them and
-again when the lead reads five; and cycle 2 onward reviews the delta, not the whole feature.
+**The larger lever is which model runs each phase, and it is independent of the track.** The line is
+whether an agent forms a judgment nobody else will re-form. Producers whose output is then audited by
+an independent agent run on the cheaper model — the product owner against its critic and business
+analyst, the UX designer against the auditor, the implementer against four review lenses and QA, the
+QA plan against the architect's review. Auditors, the architect, the debugger, the review lead and
+the release gate stay on the stronger model, because they are where the quality actually comes from.
+The full policy is protocol section 8a; the defaults are in each agent's frontmatter, and the
+orchestrator overrides them in exactly two places — down for the review lead's verify mode and for
+re-check-only UI QA, up for every producer on the `large` track.
+
+Other things that keep cost down: the shared protocol is split so every agent loads a short core and
+only the numbered sections its own definition names, rather than all of it on every turn;
+role-specific checklists live in the one agent that uses them; reports are findings-first with no
+preamble or methodology, which saves tokens writing them and again when the lead reads five; and
+cycle 2 onward reviews the delta, not the whole feature.
 
 **Two overlaps considered and rejected**, for honesty about where the limit is: reviewing a task the
 moment its implementer finishes, while other tasks in the same cycle are still being built, was
@@ -273,8 +286,9 @@ and the release gate last and alone.
 - Drop the performance and test lenses from the fan-out for internal tooling — you lose N+1 and
   unbounded-growth detection, and the check that tests assert what the plan required.
 - Lower `max_cycles` so it escalates to you sooner instead of iterating.
-- Move a lens to a cheaper model in its agent file. Measure before trusting it; lenses earn their
-  cost on subtle findings, which is what gets lost first.
+- Move a lens to a cheaper model in its agent file. This is the last lever to reach for, not the
+  first: the producers are already cheap, and a lens earns its cost on subtle findings, which is
+  exactly what gets lost first. If the budget is the problem, drop the track instead.
 - Use a single-agent review for small diffs instead of the seven-agent fan-out.
 
 What is not a lever: skipping the release gate, or letting one agent both fix and sign off. Those
@@ -359,7 +373,9 @@ Known limitations:
 - There is no locking on the workspace. Parallel safety comes from declared file ownership and the
   workplan's conflict-free task sets. If that discipline slips, concurrent writes clobber.
 - Functional QA and UI QA are deliberately sequential; they share one running app and one dataset.
-- Model choices are tuned for quality over cost. Read the cost section before running it on
+- Model choices put the strong model on judgment and the cheap one on production. That is a bet
+  that an audited producer does not need to be the strongest model; it holds because the audit is
+  real, so it stops holding if you drop lenses. Read the cost section before running it on
   everything.
 
 If you run it on something real, the most useful thing you can report is which gate produced a

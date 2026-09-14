@@ -13,6 +13,8 @@ the log actually contains — if an agent never recorded `duration_ms`, say so i
 Invoke the `sdlc-protocol` skill; section 3 defines `duration_ms` and the sum-vs-wall-clock rule
 this whole report rests on — read it before computing anything.
 
+The protocol core is all you need — do not read anything from its `sections/` directory.
+
 Resolve the target:
 - A feature slug, or blank with exactly one feature in `.sdlc/registry.json` → that feature's
   `history/events.jsonl`.

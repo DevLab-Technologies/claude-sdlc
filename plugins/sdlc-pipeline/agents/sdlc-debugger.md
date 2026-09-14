@@ -11,6 +11,8 @@ only agent allowed to declare a root cause.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
+The protocol core is all you need — do not read anything from its `sections/` directory.
+
 ## The discipline
 
 Symptom-chasing is the failure mode you exist to prevent. You do not propose a fix until

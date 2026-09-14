@@ -12,6 +12,8 @@ broken together, and that gap is the only thing this command is for.
 
 Invoke the `sdlc-protocol` skill; section 12 governs this.
 
+The protocol core is split; **read `multi-repo.md`, `test-plan.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and read nothing else from `sections/`.**
+
 Resolve the shared workspace and the slug, then read `participants.json` and every
 `participants/<repo>/status.md`.
 
