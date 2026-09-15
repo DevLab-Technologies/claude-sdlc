@@ -233,8 +233,9 @@ since it is the parallelism actually paying off.
 - `.sdlc/figma.json` — whether this project has Figma files at all, their URLs, and the access path
 - `.sdlc/features/<slug>/06-test-plan/plan.md` — the binding test contract
 - `.sdlc/features/<slug>/11-investigations/` — root-cause investigations
-- `.sdlc/features/<slug>/floor/pipeline-floor.html` — the real replay from `/sdlc-visualize`, ending
-  at the last event when generated, never live
+- `.sdlc/features/<slug>/floor/pipeline-floor.html` — a static snapshot of the Pipeline Floor from
+  `/sdlc-visualize`, frozen at the last event when generated. The live floor every pipeline run
+  starts is served from memory and writes nothing here
 - `.sdlc/features/<slug>/digest/` — short human-facing briefs derived by `/sdlc-digest`; read by
   people, never by agents, and safe to delete
 - `docs/adr/` — architecture decision records, repo-wide

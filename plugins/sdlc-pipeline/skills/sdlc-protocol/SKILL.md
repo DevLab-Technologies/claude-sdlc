@@ -122,7 +122,7 @@ One JSON line per meaningful event in `history/events.jsonl`:
 {"ts":"2026-08-10T14:22:11Z","cycle":2,"agent":"sdlc-review-lead","event":"gate_failed","phase":"08-review","verdict":"failed","summary":"1 blocker (unbounded query), 2 major","artifacts":["08-review/cycle-2/review-summary.md"],"issues_opened":["ISSUE-011"],"next":"sdlc-implementer"}
 ```
 
-Events: `phase_start`, `run_complete`, `question_asked`, `question_answered`, `issue_opened`,
+Events: `phase_start`, `run_complete`, `run_usage`, `question_asked`, `question_answered`, `issue_opened`,
 `issue_triaged`, `investigation_started`, `investigation_complete`, `root_cause_found`,
 `issue_fixed`, `issue_verified`, `issue_reopened`, `adr_recorded`, `test_plan_approved`,
 `test_plan_amended`, `figma_version_published`, `figma_drift_detected`, `figma_conflict_opened`,
@@ -139,6 +139,25 @@ Events: `phase_start`, `run_complete`, `question_asked`, `question_answered`, `i
   cycle number.
 - On `shipped`, add `"duration_ms"`: the gap from the very first event in `history/events.jsonl`
   to this one — the feature's total wall-clock, start to ship.
+
+**Name the work on the bracket.** When you were launched for a specific unit of work with an id —
+an implementer given `TASK-003`, a debugger given `INV-002` — put it on both your `phase_start` and
+your `run_complete` as `"task"`. It costs one field and it is the only thing that ties a run to the
+work it did; without it a log with three concurrent implementers cannot say which one built what.
+
+**Token cost is the orchestrator's to record, not yours.** An agent cannot observe its own usage, so
+never write a token figure on your own `run_complete` — a number you cannot measure is a number you
+guessed. The orchestrator sees each agent's usage the moment it returns, and appends one extra line
+for that run:
+
+```json
+{"ts":"2026-08-10T14:22:07Z","cycle":2,"agent":"sdlc-review-security","event":"run_usage","phase":"08-review","tokens":128400,"model":"sonnet"}
+```
+
+`tokens` is the run's total token usage as reported to the orchestrator; `model` is what it ran on;
+`task` names the unit of work when there is one. If the usage is not reported to the orchestrator,
+**write no `run_usage` line at all** — a missing line reads as "not reported" everywhere downstream,
+and an invented one reads as fact.
 
 **Sum-time and wall-time are different numbers — never conflate them when reporting.** Five review
 lenses each taking 90 seconds is 450 seconds of combined agent-time but roughly 90 seconds of

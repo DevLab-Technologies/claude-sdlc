@@ -22,6 +22,17 @@ The protocol core is all you need; read from its `sections/` directory only if t
    `.sdlc/features/bug-<slug>/` with the same layout and `brief.md` holding the report
    verbatim — including the exact error text, never a paraphrase.
 
+   Then put the Pipeline Floor up, in the background, before any agent runs — a bug run is
+   visualized like any other:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --serve
+   ```
+
+   Open the URL it prints with the browser preview tool, give the human the link, and say it is live
+   only while this session is. If the port is taken, retry once on `--port 4318`; if that fails too,
+   say so and fix the defect anyway — the visualization never blocks the work.
+
 3. **Open the issue first.** Write `issues/ISSUE-<NNN>.md` with everything the reporter
    gave you and an honest severity. If the report is too vague to act on, list precisely
    what you need — what they did, what they expected, what happened, when it started, how

@@ -39,6 +39,25 @@ The protocol core is split; **read `tracks-and-models.md`, `parallel-safety.md`,
    a complete answer and the pipeline runs normally on the markdown specification. Never guess:
    an invented Figma URL is trusted by every agent downstream.
 
+5. **Put the Pipeline Floor up before you launch anything.** Every run is visualized — the floor is
+   the only real-time view a human has of what the agents are doing, so it goes up at setup, not
+   when somebody asks for it:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --serve
+   ```
+
+   Run it in the background. It prints its URL (default `http://localhost:4317`; pass `--port` if
+   that one is taken), then watches the workspace and pushes every new event to the open page. Open
+   that URL with the browser preview tool and give the human the link in your first reply. From
+   there it tracks the pipeline by itself: do not regenerate it between phases, and do not restart
+   it per agent.
+
+   Say once, plainly, that it is live only while this session runs — a floor that has silently
+   stopped updating while still looking live is worse than no floor at all. If the port is taken,
+   retry once on `--port 4318`; if that also fails, say the floor is unavailable and run the
+   pipeline anyway. The visualization never blocks the work.
+
 ## Phase 0 and 1 overlap — research does not wait on a human
 
 Intake writes `scope.md` and `assumptions.md` in its single pass, **before** it checks whether any
@@ -109,6 +128,16 @@ Rules for the sequence:
 - **Bracket every launch in the log.** Each agent appends `phase_start` before working and
   `run_complete` after (protocol 3a). That pairing is the only thing that tells a later session which
   runs finished, so never skip it for a phase you expect to be quick.
+- **Record what each agent cost, the moment it returns.** Append its `run_usage` line (protocol
+  section 3) with the token usage reported for that run, the model it ran on, and its `task` id when
+  it had one. You are the only participant who can see a subagent's usage — the agent itself cannot
+  — so a figure you skip here is gone for good, and the floor's per-agent cost column is blank for
+  that run. If no usage was reported to you, write no line at all: everything downstream reads a
+  missing line as "not reported", which is true, where an estimate would be a fabrication.
+- **Hand every implementer its `task` id on the bracket.** The workplan task an implementer was
+  launched for goes on its `phase_start` and `run_complete` as `"task"`. Three implementers running
+  concurrently all log the same agent, phase and cycle; the task id is the only thing that says
+  which one built which task.
 - **Stop at a failed gate.** Never run a downstream phase on a failed upstream gate.
 - **Phase 3b runs after phase 4 passes, not alongside it.** The two look independent — both read
   `03-design/*.md` and write different files — but they collide on two of protocol section 9's

@@ -79,6 +79,31 @@ const PHASE_GATE = {
   "09-qa": "qa", "10-ui-qa": "ui-qa", "11-release": "release",
 };
 
+// Which desks a gate is expected to occupy. This is the only place the floor can
+// learn what has NOT happened yet: the event log records what ran, never what is
+// still to come, so "up next" is read off the phase sequence in commands/sdlc.md.
+const GATE_AGENTS = {
+  "intake": ["sdlc-intake"],
+  "research": ["sdlc-researcher-findings", "sdlc-researcher-prior-art", "sdlc-researcher-constraints"],
+  "product": ["sdlc-product-owner", "sdlc-business-analyst", "sdlc-product-critic"],
+  "design": ["sdlc-ux-designer"],
+  "figma-design": ["sdlc-figma-designer"],
+  "ux-audit": ["sdlc-ux-auditor"],
+  "architecture": ["sdlc-architect"],
+  "test-plan": ["sdlc-qa-functional"],
+  "implementation": ["sdlc-implementer-a", "sdlc-implementer-b", "sdlc-implementer-c"],
+  "review": ["sdlc-review-lead", "sdlc-code-reviewer", "sdlc-review-security",
+    "sdlc-review-performance", "sdlc-review-tests"],
+  "qa": ["sdlc-qa-functional"],
+  "ui-qa": ["sdlc-qa-ui"],
+  "release": ["sdlc-release-gate"],
+};
+
+// Desks nothing schedules. The debugger runs only when triage sends it a defect,
+// so a feature that never fails a gate never runs one — showing its desk as
+// "queued" would assert a run that nothing is going to launch.
+const ON_DEMAND_DESKS = new Set(["sdlc-debugger"]);
+
 // Agents with no fixed gate — they run against whichever gate is currently
 // contested. Resolved at grouping time from the most recent gate_failed.
 const FLOATING_AGENTS = new Set(["sdlc-debugger", "sdlc-implementer"]);
@@ -251,6 +276,14 @@ function makeRun(start, complete, gaps) {
     summary: complete?.summary || "",
     artifacts: Array.isArray(complete?.artifacts) ? complete.artifacts : [],
     verdict: complete?.verdict || "",
+    // What this run is actually working on. Implementers carry a TASK id; every
+    // other agent carries whatever the orchestrator wrote, or nothing.
+    task: start.task || complete?.task || null,
+    // Token cost. An agent cannot see its own usage, so this normally arrives on
+    // a separate run_usage event the orchestrator writes (protocol 3). null means
+    // "not reported" and is rendered as exactly that — never estimated.
+    tokens: typeof complete?.tokens === "number" ? complete.tokens : null,
+    model: complete?.model || start.model || null,
   };
 }
 
@@ -329,11 +362,16 @@ function buildState(root, slug) {
 
   const events = readEvents(logPath, gaps);
   if (!events.length) {
-    return { slug, empty: true, generatedAt: now, gaps: [`no events in ${logPath} — nothing has run yet.`], steps: [], desks: {} };
+    return { slug, empty: true, generatedAt: now,
+      gaps: [`no events in ${logPath} — nothing has run yet.`],
+      steps: [], desks: {}, plan: [], upNext: [], roster: [], tasks: [], nowRunning: [],
+      gateStatus: {}, skippedGates: [], gates: GATES,
+      tokens: { total: 0, reportedRuns: 0, totalRuns: 0 } };
   }
 
   const issueMeta = loadIssueMeta(featureDir);
   const runs = pairRuns(events, gaps);
+  attachTokens(runs, events, gaps);
   const clusters = groupRuns(runs, now);
   const signoffs = loadSignoffs(runsDir);
   const signoffTaken = new Map();   // agent -> Set of consumed indices
@@ -430,6 +468,10 @@ function buildState(root, slug) {
     for (const run of cluster) {
       const desk = deskFor(run, counter);
       if (!desk) continue;
+      // Memoised on the run itself: the roster, the task board and the token
+      // tallies all need the same answer, and deskFor's slot counter cannot be
+      // replayed a second time without handing out different desks.
+      run._desk = desk;
       if (!desks.includes(desk)) desks.push(desk);
       const ms = run.running ? null : (run.durationMs ?? 0);
       // A desk hit twice in one step (implementer slot collision) accrues both.
@@ -468,7 +510,9 @@ function buildState(root, slug) {
       if (!run.running) {
         const tail = run.artifacts.length ? " → " + run.artifacts.join(", ") : "";
         const kind = (gateEvent?.event === "gate_failed" || blocker) ? "bad" : "done";
-        ticker.push([kind, who, "run_complete" + tail + (run.summary ? " — " + run.summary : ""), run.end]);
+        const cost = typeof run.tokens === "number" ? ` · ${fmtTokens(run.tokens)} tokens` : "";
+        ticker.push([kind, who, "run_complete" + (run.task ? ` (${run.task})` : "") + tail +
+          (run.summary ? " — " + run.summary : "") + cost, run.end]);
       }
     }
     if (gateEvent) {
@@ -500,21 +544,12 @@ function buildState(root, slug) {
 
     const names = cluster.map((r) => shortName(r.agent, deskFor(r, counter))).filter(Boolean);
     const unrecorded = Object.entries(durationsRecorded).filter(([, v]) => v === false).length;
-    const current = live
-      ? `<span class="who">${names.join(", ")}</span> — running now`
-      : `<span class="who">${names.join(", ")}</span> — ${cluster[0].phase}` +
-        (unrecorded ? " (duration unrecorded)" : "");
-
     steps.push({
       id: idx,
       desks, real, state, phase: gate, cycle,
       gate: gateEvent ? gate : null,
       gateState: gateEvent ? (gateEvent.event === "gate_failed" ? "bad" : "done") : null,
-      ticker, current, signoff, live,
-      // Replay pacing, distinct from the real duration. Scaled from the real
-      // time so a long phase visibly takes longer than a short one, but clamped
-      // so a 40-minute architecture step does not stall the replay.
-      dur: replayPace(stepRealMs(real)),
+      ticker, signoff, live,
       // Snapshot past the gate event this step carries, so a step that failed a
       // gate shows the blocker it opened rather than the count from a second earlier.
       issuesAt: tallyAt(events, windowEnd, issueMeta),
@@ -523,7 +558,8 @@ function buildState(root, slug) {
         ? `${names.join(", ")} — working now in ${cluster[0].phase}.`
         : (cluster.length > 1
           ? `${cluster.length} agents ran concurrently in ${cluster[0].phase}.`
-          : `${names[0]} in ${cluster[0].phase}.`),
+          : `${names[0]} in ${cluster[0].phase}.`)
+          + (unrecorded ? " (duration unrecorded)" : ""),
     });
   });
 
@@ -541,8 +577,8 @@ function buildState(root, slug) {
       gateState: g.event === "gate_failed" ? "bad" : "done",
       ticker: [[g.event === "gate_failed" ? "bad" : "done", shortName(g.agent, g.agent) || "gate",
         g.event + (g.summary ? " — " + g.summary : ""), g._t]],
-      current: `<span class="who">${gate}</span> — ${g.event.replace("_", " ")}`,
-      signoff: null, live: false, dur: 900, issuesAt: tallyAt(events, g._t, issueMeta),
+      signoff: null, live: false,
+      issuesAt: tallyAt(events, g._t, issueMeta),
       startedAt: g._t, endedAt: g._t,
       caption: `${gate} gate ${g.event === "gate_failed" ? "failed" : "passed"}.`,
     });
@@ -577,7 +613,51 @@ function buildState(root, slug) {
     : derivedIssues;
 
   const sumAgentMs = runs.reduce((acc, r) => acc + (r.durationMs || 0), 0);
-  const wallClockMs = (shipped?.duration_ms) ?? ((anyRunning ? Date.now() : lastTs) - firstTs);
+  // Never negative: a log whose newest event is stamped ahead of this machine's
+  // clock would otherwise report a negative elapsed time. The log's own span is
+  // the floor under it — that much demonstrably happened.
+  const wallClockMs = (shipped?.duration_ms)
+    ?? (Math.max(anyRunning ? Date.now() : lastTs, lastTs) - firstTs);
+
+  // Gate status: state.json's map, overruled by any outcome the log recorded in
+  // the current cycle. state.json is the pipeline's claim about the gates; the
+  // log is what happened to them, and the log wins — an agent appends
+  // gate_failed before it updates state.json, and a session that dies between
+  // the two would otherwise leave the board reporting the stale "passed" while
+  // the gate rail beside it paints the same gate red.
+  //
+  // Only the current cycle's events overrule: opening cycle n+1 resets gates to
+  // pending in state.json, and an outcome from a closed cycle is not a claim
+  // about this one.
+  const gateStatus = readStateGates(featureDir);
+  for (const g of gateEvents) {
+    const gate = PHASE_GATE[g.phase] || AGENT_GATE[g.agent];
+    if (!gate) continue;
+    if ((g.cycle ?? 1) !== cycles) {
+      if (!gateStatus[gate]) gateStatus[gate] = g.event === "gate_failed" ? "failed" : "passed";
+      continue;
+    }
+    gateStatus[gate] = g.event === "gate_failed" ? "failed" : "passed";
+  }
+  skipped.forEach((g) => { gateStatus[g] = "skipped"; });
+
+  const tasks = loadTasks(featureDir, gaps);
+  attachTaskRuns(tasks, runs, gaps);
+  const roster = buildRoster(runs, gateStatus, now);
+  const { plan, upNext } = buildPlan(gateStatus, runs, skipped, now);
+  const nowRunning = buildNow(runs, now);
+
+  // Both halves of the coverage ratio count completed runs, and the total sums
+  // the same set. A run_usage written for a run whose run_complete has not landed
+  // — or never will, because it was interrupted — would otherwise be counted in
+  // the numerator only, printing a ratio like "7 of 6 runs reported".
+  const doneRuns = runs.filter((r) => !r.running);
+  const tokenRuns = doneRuns.filter((r) => typeof r.tokens === "number");
+  const tokens = {
+    total: tokenRuns.reduce((a, r) => a + r.tokens, 0),
+    reportedRuns: tokenRuns.length,
+    totalRuns: doneRuns.length,
+  };
 
   return {
     slug,
@@ -593,8 +673,15 @@ function buildState(root, slug) {
     wallClockMs,
     sumAgentMs,
     issues,
+    tokens,
     gates: GATES,
     skippedGates: skipped,
+    gateStatus,
+    plan,
+    upNext,
+    roster,
+    tasks,
+    nowRunning,
     steps,
     gaps,
   };
@@ -607,10 +694,13 @@ function stepRealMs(real) {
   return vals.length ? Math.max(...vals) : 0;
 }
 
-// Map a real duration onto an on-screen beat between 0.6s and 3s.
-function replayPace(ms) {
-  if (!ms) return 900;
-  return Math.round(Math.min(3000, Math.max(600, 600 + Math.sqrt(ms / 1000) * 90)));
+// Same thousands form the floor's own panels use, so a feed line and a desk row
+// never disagree about what a run cost.
+function fmtTokens(n) {
+  if (typeof n !== "number") return "?";
+  if (n < 1000) return String(n);
+  if (n < 1000000) return (n / 1000).toFixed(n < 10000 ? 1 : 0) + "k";
+  return (n / 1000000).toFixed(2) + "M";
 }
 
 // The issue ledger as it stood at a moment in time. Counting per-step deltas
@@ -722,6 +812,260 @@ function shortName(agentId, deskId) {
 }
 
 /* ============================================================
+   TOKENS — cost per run, from the orchestrator's run_usage events
+   ============================================================ */
+
+// A subagent cannot observe its own token usage, so it cannot write it on its own
+// run_complete. The orchestrator can — it sees the usage the moment the agent
+// returns — and records it as a separate run_usage event (protocol section 3).
+// Matching is by agent+phase+cycle, then by nearest timestamp, which is what
+// keeps three concurrent implementers' costs on the right three desks.
+function attachTokens(runs, events, gaps) {
+  const usage = events.filter((e) => e.event === "run_usage");
+  let unmatched = 0;
+  for (const u of usage) {
+    const pool = runs.filter((r) => r.agent === u.agent && r.phase === u.phase
+      && (r.cycle ?? 1) === (u.cycle ?? 1) && r.tokens == null
+      && (!u.task || !r.task || r.task === u.task));
+    if (!pool.length) { unmatched++; continue; }
+    let best = pool[0], bestD = Infinity;
+    for (const r of pool) {
+      const d = Math.abs((r.end ?? r.start) - u._t);
+      if (d < bestD) { bestD = d; best = r; }
+    }
+    if (typeof u.tokens === "number") best.tokens = u.tokens;
+    if (u.model) best.model = u.model;
+    if (u.task && !best.task) best.task = u.task;
+  }
+  if (unmatched) {
+    gaps.push(`${unmatched} run_usage event(s) matched no run — their token cost is not shown on any desk.`);
+  }
+  const missing = runs.filter((r) => !r.running && r.tokens == null).length;
+  if (missing) {
+    gaps.push(`${missing} completed run(s) carry no token usage — those desks read "not reported". The total is the sum of what was recorded, never an estimate of what was not.`);
+  }
+}
+
+/* ============================================================
+   TASKS — the workplan, and what has been built against it
+   ============================================================ */
+
+// The event log says what ran; it never says what the work was. The workplan is
+// the only place the task list exists, and 07-implementation/TASK-<NNN>.md is the
+// only place a task's outcome is recorded — so the board is read off both.
+function loadTasks(featureDir, gaps) {
+  const wpPath = path.join(featureDir, "05-architecture", "workplan.md");
+  const tasks = [];
+  if (fs.existsSync(wpPath)) {
+    let text = "";
+    try { text = fs.readFileSync(wpPath, "utf8"); } catch { text = ""; }
+    // `## TASK-003 — Session store and middleware`, then key: value lines until
+    // the next heading. Written by the architect (agents/sdlc-architect.md).
+    const parts = text.split(/\r?\n(?=##\s)/);
+    for (const part of parts) {
+      const head = part.match(/^##\s+(TASK-\d+)\s*[—:-]?\s*(.*)$/m);
+      if (!head) continue;
+      const field = (name) => {
+        const m = part.match(new RegExp("^" + name + ":\\s*(.+)$", "m"));
+        return m ? m[1].trim() : "";
+      };
+      const list = (name) => field(name).replace(/^\[|\]$/g, "").split(",")
+        .map((v) => v.trim()).filter(Boolean);
+      tasks.push({
+        id: head[1],
+        title: head[2].trim(),
+        ownerRole: field("owner_role") || null,
+        stories: list("stories"),
+        dependsOn: list("depends_on"),
+        parallelWith: list("parallel_with"),
+        status: "pending", recorded: false,
+        desk: null, startedAt: null, endedAt: null, ms: 0, tokens: null, running: false,
+      });
+    }
+  }
+
+  // Outcome, straight from the record the implementer writes.
+  const implDir = path.join(featureDir, "07-implementation");
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  if (fs.existsSync(implDir)) {
+    for (const name of fs.readdirSync(implDir)) {
+      if (!/^TASK-\d+\.md$/.test(name)) continue;
+      let text = "";
+      try { text = fs.readFileSync(path.join(implDir, name), "utf8"); } catch { continue; }
+      const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+      const id = (fm && (fm[1].match(/^task:\s*(\S+)/m) || [])[1]) || name.replace(/\.md$/, "");
+      // No status to read means no outcome was recorded — an empty file, or one
+      // whose frontmatter block was never closed, which is exactly the partial
+      // artifact protocol 3a quarantines. Defaulting it to "complete" reported
+      // an interrupted write as finished work.
+      const status = fm && (fm[1].match(/^status:\s*(\w+)/m) || [])[1];
+      let t = byId.get(id);
+      if (!t) {
+        // A task record with no workplan entry still describes real work; show it
+        // rather than dropping it, and say where it came from.
+        gaps.push(`${id} has an implementation record but no entry in 05-architecture/workplan.md — shown on the board from the task record alone.`);
+        t = { id, title: "", ownerRole: null, stories: [], dependsOn: [], parallelWith: [],
+          status: "pending", recorded: false,
+          desk: null, startedAt: null, endedAt: null, ms: 0, tokens: null, running: false };
+        tasks.push(t); byId.set(id, t);
+      }
+      if (!status) {
+        gaps.push(`${id}: 07-implementation/${name} carries no readable status frontmatter — the record is empty or partial, so the board cannot say what the task produced.`);
+        continue;
+      }
+      t.status = status;                       // complete | partial | blocked
+      t.recorded = true;                       // a record exists, so the status is real
+    }
+  }
+  return tasks;
+}
+
+// Fold the runs that named a task into the board. A run with no `task` field
+// cannot be attributed to one — that is a gap, not a guess.
+function attachTaskRuns(tasks, runs, gaps) {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  let unattributed = 0;
+  for (const r of runs) {
+    if (r.agent !== "sdlc-implementer") continue;
+    if (!r.task) { unattributed++; continue; }
+    const t = byId.get(r.task);
+    if (!t) continue;
+    t.desk = r._desk || t.desk;
+    t.startedAt = t.startedAt == null ? r.start : Math.min(t.startedAt, r.start);
+    if (r.running) { t.running = true; t.status = "running"; }
+    else {
+      t.endedAt = Math.max(t.endedAt ?? 0, r.end ?? 0) || null;
+      t.ms += r.durationMs || 0;
+    }
+    if (typeof r.tokens === "number") t.tokens = (t.tokens || 0) + r.tokens;
+  }
+  if (unattributed) {
+    gaps.push(`${unattributed} implementer run(s) named no task — the board cannot say which workplan task they built, so they appear only on the desks.`);
+  }
+  // A task whose run started and finished, with no 07-implementation/TASK-<NNN>.md
+  // behind it, has an outcome nobody recorded. Leaving it "pending" states the
+  // opposite of what the log shows — the row would read "never started" while
+  // carrying the time and tokens of a completed run — and undercounts the board's
+  // "N of M complete".
+  const unrecorded = tasks.filter((t) => !t.recorded && !t.running && t.endedAt != null);
+  for (const t of unrecorded) {
+    t.status = "unknown";
+  }
+  if (unrecorded.length) {
+    gaps.push(`${unrecorded.length} task(s) ran to completion with no usable outcome behind them — 07-implementation/TASK-<NNN>.md is missing or unreadable — so the board shows them "unknown": the log proves the run finished, but nothing records what it produced.`);
+  }
+}
+
+/* ============================================================
+   ROSTER, PLAN, NOW — done / doing / remaining, per agent
+   ============================================================ */
+
+// One row per desk: everything it has ever done in this feature, what it is doing
+// this instant, and whether it is still expected to run. A desk with no runs is
+// only "queued" if its gate has not been passed or skipped — otherwise the
+// pipeline is simply never going to reach it.
+function buildRoster(runs, gateStatus, now) {
+  const rows = [];
+  for (const deskId of DESK_IDS) {
+    const mine = runs.filter((r) => r._desk === deskId);
+    const running = mine.find((r) => r.running) || null;
+    const done = mine.filter((r) => !r.running);
+    const recent = running || (done.length ? done[done.length - 1] : null);
+    // sdlc-qa-functional has no fixed gate — it plans in phase 6 and executes in
+    // phase 9 — so fall back to the phase its own last run logged under.
+    const gate = AGENT_GATE[deskId] || AGENT_GATE[deskId.replace(/-[abc]$/, "")]
+      || (recent ? PHASE_GATE[recent.phase] : null) || null;
+    const tokenRuns = done.filter((r) => typeof r.tokens === "number");
+    const last = done.length ? done[done.length - 1] : null;
+    let status;
+    if (running) status = "working";
+    else if (mine.length) status = "done";
+    else if (ON_DEMAND_DESKS.has(deskId)) status = "idle";
+    else if (gate && (gateStatus[gate] === "passed" || gateStatus[gate] === "skipped")) status = "idle";
+    else status = "queued";
+    rows.push({
+      desk: deskId, gate, status,
+      runs: mine.length,
+      // Clamped: a phase_start timestamped slightly ahead of this machine's clock
+      // would otherwise render as negative elapsed time, which reads as a bug in
+      // the floor rather than as the clock skew it is.
+      totalMs: done.reduce((a, r) => a + (r.durationMs || 0), 0) + (running ? Math.max(0, now - running.start) : 0),
+      liveSince: running ? running.start : null,
+      task: running ? running.task : (last ? last.task : null),
+      phase: running ? running.phase : (last ? last.phase : null),
+      cycle: running ? running.cycle : (last ? last.cycle : null),
+      model: running ? running.model : (last ? last.model : null),
+      tokens: tokenRuns.length ? tokenRuns.reduce((a, r) => a + r.tokens, 0) : null,
+      tokensMissing: done.length - tokenRuns.length,
+      lastSummary: last ? last.summary : "",
+    });
+  }
+  return rows;
+}
+
+// The gate rail as a sequence with a position in it: what is finished, what is
+// being worked, and — the part no event can tell you — what is still to come and
+// who will do it.
+function buildPlan(gateStatus, runs, skipped, now) {
+  const runningGates = new Set(runs.filter((r) => r.running)
+    .map((r) => AGENT_GATE[r.agent] || PHASE_GATE[r.phase]).filter(Boolean));
+  const rows = GATES.map((g) => {
+    const mine = runs.filter((r) => (AGENT_GATE[r.agent] || PHASE_GATE[r.phase]) === g);
+    const doneRuns = mine.filter((r) => !r.running);
+    const tokenRuns = doneRuns.filter((r) => typeof r.tokens === "number");
+    let status = gateStatus[g] || "pending";
+    if (skipped.indexOf(g) > -1) status = "skipped";
+    else if (runningGates.has(g)) status = "working";
+    return {
+      gate: g, status,
+      agents: GATE_AGENTS[g] || [],
+      runs: mine.length,
+      // Summed agent time, which the panel labels as such. It is larger than the
+      // gate's elapsed time whenever a fan-out ran concurrently — protocol
+      // section 3 — so it must never be presented as how long the gate took.
+      realMs: doneRuns.reduce((a, r) => a + (r.durationMs || 0), 0),
+      tokens: tokenRuns.length ? tokenRuns.reduce((a, r) => a + r.tokens, 0) : null,
+    };
+  });
+  // Everything still ahead, in the order commands/sdlc.md runs it.
+  const firstUnfinished = rows.findIndex((r) => r.status !== "passed" && r.status !== "skipped");
+  const upNext = rows
+    .slice(firstUnfinished === -1 ? rows.length : firstUnfinished)
+    .filter((r) => r.status !== "skipped" && r.status !== "working")
+    .map((r) => ({ gate: r.gate, agents: r.agents }));
+  return { plan: rows, upNext };
+}
+
+// What is happening this instant, with its own clock. Read straight off the
+// unpaired phase_starts, which is also why the floor cannot tell "running" from
+// "interrupted" — both look exactly like this in the log.
+function buildNow(runs, now) {
+  return runs.filter((r) => r.running).map((r) => ({
+    agent: r.agent, desk: r._desk || null, phase: r.phase, cycle: r.cycle,
+    gate: AGENT_GATE[r.agent] || PHASE_GATE[r.phase] || null,
+    task: r.task, model: r.model,
+    startedAt: r.start, elapsedMs: Math.max(0, now - r.start),
+  }));
+}
+
+// The gate map state.json records, which is authoritative for anything the event
+// log never emitted an outcome for (a skip, a gate reset when a cycle opened).
+function readStateGates(featureDir) {
+  const statePath = path.join(featureDir, "state.json");
+  if (!fs.existsSync(statePath)) return {};
+  try {
+    const st = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    const g = st.gates || {};
+    const out = {};
+    Object.keys(g).forEach((k) => {
+      const v = g[k];
+      out[k] = typeof v === "string" ? v : (v && v.status) || "pending";
+    });
+    return out;
+  } catch { return {}; }
+}
+
+/* ============================================================
    WRITE
    ============================================================ */
 
@@ -765,6 +1109,12 @@ function serve(root, slug, port) {
     return JSON.stringify({
       steps: s.steps, gaps: s.gaps, skippedGates: s.skippedGates,
       issues: s.issues, running: s.running, cycle: s.cycle, empty: s.empty,
+      // The board and the roster move on file writes that emit no event at all —
+      // a workplan landing, a task record flipping to complete, a gate reset in
+      // state.json. Leaving them out of the fingerprint is what would make the
+      // page sit on a stale task list while claiming to be live.
+      plan: s.plan, tasks: s.tasks, tokens: s.tokens,
+      roster: (s.roster || []).map((r) => r.desk + ":" + r.status + ":" + r.runs + ":" + r.tokens),
     });
   }
 
@@ -789,6 +1139,13 @@ function serve(root, slug, port) {
   // which would arrive as a truthy `force` and push on every poll.
   fs.watchFile(logPath, { interval: 1000 }, () => rebuild());
   if (fs.existsSync(runsDir)) fs.watchFile(runsDir, { interval: 2000 }, () => rebuild());
+  // The task board and the gate rail are read off files, not events. Watch them
+  // too, or the floor shows a workplan that landed minutes ago as still absent.
+  // watchFile on a path that does not exist yet is legal and fires when it appears.
+  [path.join(featureDir, "state.json"),
+   path.join(featureDir, "05-architecture", "workplan.md"),
+   path.join(featureDir, "07-implementation")]
+    .forEach((target) => fs.watchFile(target, { interval: 2000 }, () => rebuild()));
   // A run in progress needs its elapsed clock to keep advancing even when the log
   // is quiet, so force a push periodically while anything is running.
   setInterval(() => { if (state.running) rebuild(true); }, 5000).unref?.();
