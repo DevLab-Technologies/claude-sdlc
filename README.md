@@ -275,11 +275,23 @@ phase, so the wins come from removing waits:
 - **The workplan is pushed toward wider parallel sets.** Every `depends_on` costs a serial step, so
   the architect has to justify each one — a dependency created by how the work was carved up is not
   a real dependency.
+- **Implementers verify what they own, and the tree is verified once.** A parallel implementer runs
+  the type check and the tests covering its own files, not the full suite: run from inside the
+  group, the suite measures a tree the other members are still rewriting — so a failure may belong
+  to someone else's task — and it spends the same minutes once per member. The integrated build
+  runs at the join, and that run *is* the review phase's fast stage rather than an extra one.
 - Mechanical steps run on a faster model, which cuts latency as well as cost.
 
 Barriers that stay, because removing them costs the property the pipeline exists for: the four
 concurrency hazards in section 9, functional QA before UI QA, a reviewer re-verifying after a fix,
 and the release gate last and alone.
+
+**Adding implementers is not a lever**, though it is the first one people reach for. The count is
+one per workplan task and only file-disjoint tasks run together, so width is set by the
+decomposition rather than by whoever launches — and past the work's real independence every extra
+member is paid for in full while saving nothing. Implementation is also one phase of twelve, so
+even taking it to zero leaves every barrier above standing. Carve for independence, or drop the
+track (protocol section 9b).
 
 **If you want it cheaper still**, the levers with their costs named:
 

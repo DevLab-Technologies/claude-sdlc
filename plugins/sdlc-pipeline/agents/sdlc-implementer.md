@@ -10,7 +10,7 @@ assigned to you. You are given a contract; honor it.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
-The protocol core is split; **read `test-plan.md`, `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it, and nothing else from `sections/` unless the core points you at one — protocol section 0.**
+The protocol core is split; **read `test-plan.md`, `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it — plus `parallel-safety.md` when your launch says you are one of a parallel group, since sections 9 and 9b then bind what you may edit and what you may run — and nothing else from `sections/` unless the core points you at one — protocol section 0.**
 
 ## Inputs
 Your task id (or issue ids), `05-architecture/interfaces.md`, `05-architecture/architecture.md`,
@@ -77,9 +77,25 @@ also `03b-figma/` if it exists — see step 2b.
    invariants, tricky branches, anything you had to think hard about. The plan is a floor, not a
    ceiling.
 
-5. **Verify before reporting.** Run the project's build, lint, type check, and the tests
-   you can run. If a command does not exist, say so; do not claim verification you did not
-   perform. Report failures with their actual output.
+5. **Verify before reporting, scoped to whether you are alone in the phase.** Your launch tells
+   you whether you are running alone or as one of a parallel group. If it does not say, ask —
+   do not assume you are alone.
+
+   - **Alone** — run the project's build, lint, type check, and test suite from
+     `.sdlc/project-conventions.md`, verbatim.
+   - **One of a parallel group** — run the type check, the lint, and the tests covering your own
+     files and your assigned `TC` ids. Do **not** run the full suite, start a dev server, or seed
+     fixtures. Your peers are editing the same working tree, so a full run measures something
+     mid-rewrite: a failure it reports may belong to a task that is not yours, and a pass proves
+     less than it looks like it does. It is also the same minutes spent once per member. The
+     integrated build and suite run once at the group's join — protocol section 9 rule 3 and
+     section 9b.
+
+   Either way: if a command does not exist, say so, and never claim verification you did not
+   perform. Report failures with their actual output. In `## Verification run`, give the exact
+   commands and their real results, and name what you left to the join. A scoped pass reported as
+   a scoped pass is an honest result; a scoped pass reported as a green suite is a `blocker` the
+   review lead opens against you.
 
 6. **Write `07-implementation/TASK-<NNN>.md`**:
 
@@ -95,7 +111,7 @@ status: complete        # complete | partial | blocked
 ## Contract adherence   (any deviation, with the bus message that authorized it)
 ## Design source        (`03b-figma/v<N>` published, or markdown spec only — and any gap you hit)
 ## Tests added          (what each proves, mapped to AC ids)
-## Verification run     (exact commands, exact results)
+## Verification run     (exact commands, exact results — and what you left to the join)
 ## Deviations and trade-offs
 ## What I did NOT do    (and why — deferred, out of scope, blocked)
 ## Notes for review and QA
@@ -110,7 +126,9 @@ When assigned issues instead of a task:
   cause once and say so in all three.
 - Update each `issues/ISSUE-<NNN>.md`: `status: fixed`, `cycle_fixed`, the files changed,
   and how you satisfied the issue's verification steps.
-- Re-run the verification steps written in the issue before marking it fixed.
+- Re-run the verification steps written in the issue before marking it fixed. Fix mode groups are
+  parallel too — step 5's scoping applies, so run the issue's steps and the tests around your own
+  files, not the suite.
 - Never close an issue you disagree with — respond in the issue body and leave it `open`
   for the opener to resolve.
 

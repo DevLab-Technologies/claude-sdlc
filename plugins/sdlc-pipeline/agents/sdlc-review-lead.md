@@ -32,6 +32,11 @@ five agents do not each derive it differently. Seconds, not minutes. Write
 **If the build or type check fails, stop and say so.** Nobody reviews code that does not compile,
 and this is the only thing the fan-out waits on.
 
+You may be called for this stage earlier than the review phase — as the join of a parallel
+implementation group, whose members verified only their own files (protocol section 9b). It is the
+same run either way, against the same tree, so write the same file; the caller carries it into the
+review phase rather than asking you for it twice.
+
 ## Stage 2 — verify-slow (runs alongside the static lenses)
 
 The suite, the smoke test, and the claim check. Append to the same file under
@@ -59,6 +64,12 @@ suite is three wasted runs. You run it **once**, and they read your result.
    run" section. Compare it against what you actually observed. A claim of passing tests that do
    not pass is a `blocker` and a serious one — downstream agents were handed false information.
    Record the discrepancy precisely.
+
+   An implementer that ran as one of a parallel group reports **scoped** verification — its own
+   files and its `TC` ids, not the suite (protocol section 9b). That is the rule, not a gap, and
+   your run is the one that covers the rest. The inverse is the finding: a group member claiming a
+   clean full-suite run measured a tree its peers were still editing, so the claim is unfounded
+   whatever the result says — treat it as a claim to check, never as evidence you can lean on.
 
 4. **Assemble the diff** for the reviewers: the commit range or the file list from the task
    records, so five agents do not each re-derive it differently.

@@ -170,6 +170,23 @@ Rules for the sequence:
 - **Phase 7 implementers must be handed their `TC` ids**, from `06-test-plan/assignments.md`.
   An implementer launched without its assigned cases will invent its own tests, which is the
   failure mode this phase exists to prevent.
+- **Tell every implementer whether it is alone or one of a group, and verify the tree once at the
+  join.** A parallel implementer runs only the checks scoped to its own files; the full build and
+  suite belong to the join, not to each member — running the suite from inside the group measures a
+  tree the other members are still rewriting, and spends the same minutes once per member
+  (protocol section 9 rule 3, section 9b). So when a parallel group returns, launch
+  `sdlc-review-lead` **verify-fast** before you set the implementation gate. Without it the gate
+  claims `passed` for a tree nobody compiled. It is not an extra run: verify-fast is the first
+  thing phase 8 does, it takes seconds, and its `verification.md` carries straight into phase 8 —
+  do not run it twice. If it fails, fail the implementation gate and send the break back to the
+  implementers whose files caused it; do not fan out the review, and re-run the join when they
+  return.
+- **Fan-out width comes from the workplan, not from you** (protocol section 9b). There is no dial
+  for "more implementers": the count is one per task, and only `parallel_with` tasks run together.
+  More tasks over the same files is slower than fewer, and a group wider than the work's real
+  independence pays for every member while saving only on the independent ones. If phase 7 needs to
+  be shorter, that is a message to the architect about the decomposition — and before any of it,
+  check that the group went out in **one** message.
 - **Intake blocking questions stop the product phase, not the pipeline.** Present them to the human
   verbatim and wait — but only phase 2 onward actually waits, since research does not need the
   answers (see the overlap note above). This is the one place the pipeline blocks on a person, and
@@ -199,7 +216,8 @@ Rules for the sequence:
   what anyone examines. `/sdlc-review` runs the same sequence standalone:
   1. `sdlc-review-lead` **verify-fast** — build, type check, diff scope. Seconds. If the build fails,
      stop here; nobody reviews code that does not compile. This is the *only* thing the fan-out waits
-     on.
+     on. Where a parallel phase-7 join already ran it against this same tree, that run **was** this
+     step: carry its `verification.md` forward instead of repeating it.
   2. **In one message, all at once**: `sdlc-review-lead` **verify-slow** (suite, smoke, claim check)
      plus the four static lenses — `sdlc-code-reviewer`, `sdlc-review-security`,
      `sdlc-review-performance`, and `sdlc-architect` (compliance). The static lenses read source and

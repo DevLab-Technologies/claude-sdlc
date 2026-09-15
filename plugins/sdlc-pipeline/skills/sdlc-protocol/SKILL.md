@@ -26,7 +26,7 @@ reference to "section 9" means the same thing it always did.
 | 4a | `test-plan.md` | you author, review, amend, or implement test cases |
 | 7a | `termination.md` | you decide whether the feature is done (`sdlc-release-gate`, the orchestrator) |
 | 8 | `tracks-and-models.md` | you pick the track or the model for a phase — orchestrator only |
-| 9, 9a | `parallel-safety.md` | you launch a parallel group, or you are a member of one |
+| 9, 9a, 9b | `parallel-safety.md` | you launch a parallel group, or you are a member of one |
 | 12 | `multi-repo.md` | the work spans more than one repository |
 
 **Read the ones your agent definition names, in a single batch, before you start work** — not one at
