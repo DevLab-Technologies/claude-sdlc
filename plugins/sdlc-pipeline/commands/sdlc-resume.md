@@ -85,6 +85,17 @@ records a run that failed — that record is the evidence this command depends o
 
 ## Step 4 — Re-run only what was interrupted
 
+Put the Pipeline Floor up first, in the background, so the continued run is visualized like any
+other — and so the human can watch the re-runs land rather than reading about them afterwards:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --serve
+```
+
+Open the URL it prints with the browser preview tool and hand over the link. The floor derives its
+own state from the log each time it changes, so the quarantining in step 3 needs nothing from you
+here. If the port is taken, retry once on `--port 4318`; if that fails, say so and resume anyway.
+
 Launch exactly the agents whose runs were unpaired, with the same inputs, cycle, and track they had.
 Preserve already-allocated numbers — `ISSUE-011`, `INV-004`, `TC-014` keep their ids, and a re-run
 revises in place rather than appending a second copy.

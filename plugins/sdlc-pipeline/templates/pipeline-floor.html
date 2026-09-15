@@ -282,8 +282,7 @@
   .signoff-card .k { color: var(--signal); font-weight: 600; }
 
   .ticker {
-    flex: 1;
-    overflow-y: auto;
+    flex: none;
     padding: 10px 14px;
     font-family: var(--font-mono);
     font-size: 11.5px;
@@ -305,9 +304,9 @@
   @keyframes rowIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 
   .ticker-row .t { color: var(--ink-faint); }
-  /* Day divider — the feed carries real event times, so a replay can cross
-     midnight or span days. Without this, 23:59 followed by 00:02 reads as a
-     clock that went backwards. */
+  /* Day divider — the feed carries the times events actually happened, so a
+     backlog loaded at once can cross midnight or span days. Without this, 23:59
+     followed by 00:02 reads as a clock that went backwards. */
   .ticker-day {
     color: var(--ink-faint);
     letter-spacing: .08em;
@@ -360,6 +359,116 @@
     margin-top: 2px;
   }
 
+  /* ---------- now / board / roster ---------- */
+
+  /* The panel scrolls as one column; the pinned blocks stay put and only the
+     selected tab's body moves. */
+  .panel-scroll {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tabs {
+    flex: none;
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--panel-line);
+  }
+
+  .tab {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 9px 4px;
+    cursor: pointer;
+  }
+
+  .tab:hover { color: var(--ink-dim); }
+  .tab:focus-visible { outline: 2px solid var(--signal); outline-offset: -2px; }
+  .tab[aria-selected="true"] { color: var(--signal); border-bottom-color: var(--signal); }
+
+  .tab-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--panel-line) transparent;
+  }
+
+  .tab-body[hidden] { display: none; }
+
+  .rows { padding: 10px 14px; font-family: var(--font-mono); font-size: 11.5px; }
+
+  .rows .group-label {
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 4px 0 6px;
+  }
+
+  .rows .group-label:not(:first-child) { margin-top: 14px; }
+
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 8px;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+
+  .row .name { color: var(--ink); overflow-wrap: anywhere; }
+  .row .meta {
+    grid-column: 1 / -1;
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    overflow-wrap: anywhere;
+  }
+  .row .num { color: var(--ink-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .chip {
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--panel-line);
+    color: var(--ink-faint);
+    background: var(--floor);
+    white-space: nowrap;
+  }
+
+  .chip.working { color: #1a1206; background: var(--signal); border-color: var(--signal); }
+  .chip.done    { color: #0d2019; background: var(--ok); border-color: var(--ok); }
+  .chip.bad     { color: #2a0d0d; background: var(--bad); border-color: var(--bad); }
+  .chip.queued  { color: var(--signal); border-color: var(--signal-dim); background: transparent; }
+
+  /* A running desk's own clock. It ticks off the recorded phase_start, so it is
+     elapsed time, not an animation. */
+  .now-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 4px 0;
+  }
+
+  .now-row .who { color: var(--signal); font-weight: 600; }
+  .now-row .el { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .now-row .task { color: var(--ink-dim); }
+
+  .empty-note { color: var(--ink-faint); font-style: italic; padding: 12px 14px; font-family: var(--font-mono); font-size: 11.5px; }
+
   /* ---------- controls ---------- */
 
   footer {
@@ -377,21 +486,23 @@
     flex-wrap: wrap;
   }
 
-  button.ctl {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.02em;
-    color: var(--ink);
-    background: var(--floor);
-    border: 1px solid var(--panel-line);
-    border-radius: 3px;
-    padding: 6px 12px;
-    cursor: pointer;
+  /* The footer carries readouts, not controls. There is nothing to play, pause
+     or rewind: the floor only ever shows where the pipeline actually is. */
+  .readout {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
   }
 
-  button.ctl:hover { border-color: var(--signal-dim); color: var(--signal); }
-  button.ctl:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
-  button.ctl.on { color: #1a1206; background: var(--signal); border-color: var(--signal); }
+  .readout .k {
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .readout .v { color: var(--ink); font-variant-numeric: tabular-nums; }
 
   .proto-tag {
     margin-left: auto;
@@ -601,6 +712,7 @@
     .stat { padding: 6px 6px 5px; }
     .stat .n { font-size: 15px; }
     .ticker { padding: 8px 12px; }
+    .rows { padding: 8px 12px; }
 
     /* A single run_complete can carry a dozen artifact paths. Clamped, the feed
        stays scannable; tapping a line opens it in full. */
@@ -642,7 +754,7 @@
   /* Touch targets: 11px buttons with 6px padding are under every thumb-size
      guideline, and the floor has only three controls to grow. */
   @media (pointer: coarse) {
-    button.ctl { padding: 10px 14px; font-size: 12px; }
+    .tab { padding: 12px 4px; font-size: 11px; }
     .modal-close { padding: 6px 10px; }
   }
 
@@ -670,8 +782,11 @@
 
   <aside>
     <div class="panel-block">
-      <p class="panel-label"><span class="dot"></span>now</p>
-      <div class="current-line" id="currentLine">intake reading the brief</div>
+      <p class="panel-label"><span class="dot"></span>working right now</p>
+      <div class="current-line" id="currentLine">waiting for the first event</div>
+      <!-- One row per agent with an open phase_start, each with its own elapsed
+           clock counting from the timestamp that agent recorded. -->
+      <div id="nowList"></div>
       <div class="signoff-card" id="signoffCard">
         <span class="k">NOT verified —</span> <span id="signoffText"></span>
       </div>
@@ -685,15 +800,36 @@
       </div>
     </div>
 
-    <p class="panel-label" style="padding: 10px 14px 0;"><span class="dot"></span>live feed</p>
-    <div class="ticker" id="ticker"></div>
+    <div class="panel-scroll">
+      <div class="tabs" role="tablist">
+        <button class="tab" id="tabBoard" role="tab" aria-selected="true" aria-controls="paneBoard">board</button>
+        <button class="tab" id="tabAgents" role="tab" aria-selected="false" aria-controls="paneAgents">agents</button>
+        <button class="tab" id="tabFeed" role="tab" aria-selected="false" aria-controls="paneFeed">feed</button>
+      </div>
+
+      <!-- What the work is and what is left of it: the workplan tasks, then the
+           gates still ahead and who runs them. Neither is derivable from the
+           event log alone, which is why the builder reads both off disk. -->
+      <div class="tab-body" id="paneBoard" role="tabpanel" aria-labelledby="tabBoard">
+        <div class="rows" id="boardRows"></div>
+      </div>
+
+      <div class="tab-body" id="paneAgents" role="tabpanel" aria-labelledby="tabAgents" hidden>
+        <div class="rows" id="agentRows"></div>
+      </div>
+
+      <div class="tab-body" id="paneFeed" role="tabpanel" aria-labelledby="tabFeed" hidden>
+        <div class="ticker" id="ticker"></div>
+      </div>
+    </div>
   </aside>
 </main>
 
 <footer>
-  <button class="ctl on" id="btnPlay">⏸ pause</button>
-  <button class="ctl" id="btnSpeed">1×</button>
-  <button class="ctl" id="btnRestart">↺ replay from start</button>
+  <span class="readout"><span class="k">elapsed</span><span class="v" id="outElapsed">—</span></span>
+  <span class="readout"><span class="k">agent time</span><span class="v" id="outAgentTime">—</span></span>
+  <span class="readout"><span class="k">tokens</span><span class="v" id="outTokens">—</span></span>
+  <span class="readout"><span class="k">runs</span><span class="v" id="outRuns">—</span></span>
   <span class="proto-tag" id="protoTag">reading history/events.jsonl</span>
 </footer>
 
@@ -710,8 +846,12 @@
     <div class="modal-now">
       <span class="label">right now</span>
       <span id="modalNow">—</span>
-      <br><span class="label" style="margin-top:8px;">time worked this run</span>
+      <br><span class="label" style="margin-top:8px;">time worked</span>
       <span id="modalTime">—</span>
+      <br><span class="label" style="margin-top:8px;">working on</span>
+      <span id="modalTask">—</span>
+      <br><span class="label" style="margin-top:8px;">tokens used</span>
+      <span id="modalTokens">—</span>
     </div>
     <div class="modal-log">
       <span class="label">what it did this run</span>
@@ -838,13 +978,13 @@
      is hand-written, and nothing loops — the end of SCRIPT means
      the log has no further events yet.
 
-     Each step carries two independent durations. "real" is a
-     {deskId: ms} map of what each agent actually recorded, and a
-     step's contribution to its phase total is the largest of them,
-     never the sum: concurrent desks waited once, together. "dur"
-     is on-screen pacing for the replay only, and has nothing to do
-     with elapsed time. Conflating the two is the mistake the real
-     /sdlc-timing report also exists to avoid.
+     A step's "real" is a {deskId: ms} map of what each agent
+     actually recorded, and its contribution to the phase total is
+     the largest of them, never the sum: concurrent desks waited
+     once, together. Summing parallel durations and calling the
+     result elapsed time is the mistake /sdlc-timing also exists to
+     avoid. There is no second, on-screen duration — the floor does
+     not pace anything, because it does not replay anything.
      ============================================================ */
 
   var SCRIPT = [];
@@ -884,21 +1024,32 @@
     gateRailEl.appendChild(pill);
   });
 
+  var nowListEl = document.getElementById("nowList");
+  var boardRowsEl = document.getElementById("boardRows");
+  var agentRowsEl = document.getElementById("agentRows");
+  var outElapsed = document.getElementById("outElapsed");
+  var outAgentTime = document.getElementById("outAgentTime");
+  var outTokens = document.getElementById("outTokens");
+  var outRuns = document.getElementById("outRuns");
+
   var stepIndex = -1;
-  var stepStart = 0;
-  var liveMode = true;          // live | replay
   var stream = null;
   var lastState = null;
-  var playing = true;
-  var speed = 1;
   var raf = null;
   var hoveredDesk = null;
-  var wasPlayingBeforeModal = true;
   var phaseTotals = {};
+  var rosterByDesk = {};        // desk id -> the builder's roster row
+  var upNextDesks = {};         // desk id -> true, for the gate that runs next
+  var modalDeskId = null;       // open modal's desk, so its clock can keep ticking
+  // A static snapshot is a moment in the past. Its clocks stay where they were:
+  // a counter ticking upward on a file built last week claims a run is still
+  // going, which is exactly the false signal the header is careful not to give.
+  var snapshotMode = false;
 
   // Same day/hour/minute/second/ms rule the real /sdlc-timing report uses: at most
   // two units, largest first, second dropped when zero, ms only under one second.
   function fmtDuration(ms) {
+    if (!(ms > 0)) return "0s";
     if (ms < 1000) return Math.round(ms) + "ms";
     var s = Math.round(ms / 1000);
     if (s < 60) return s + "s";
@@ -910,27 +1061,19 @@
     return h ? (d + "d " + h + "h") : (d + "d");
   }
 
-  var pauseStartedAt = null;
-
-  function setPlaying(v) {
-    // stepStart is compared against live wall-clock time, so time spent paused
-    // has to be excluded from that comparison on resume, or the step in progress
-    // when pause was hit gets skipped the instant playback resumes.
-    if (!v && playing) { pauseStartedAt = performance.now(); }
-    else if (v && !playing && pauseStartedAt != null) {
-      stepStart += performance.now() - pauseStartedAt;
-      pauseStartedAt = null;
-    }
-    playing = v;
-    var btn = document.getElementById("btnPlay");
-    btn.classList.toggle("on", playing);
-    btn.textContent = playing ? "⏸ pause" : "▶ play";
+  // Tokens are reported, never estimated: null means no run_usage event carried a
+  // figure, and that is said in those words rather than shown as a zero.
+  function fmtTokens(n) {
+    if (typeof n !== "number") return "not reported";
+    if (n < 1000) return String(n);
+    if (n < 1000000) return (n / 1000).toFixed(n < 10000 ? 1 : 0) + "k";
+    return (n / 1000000).toFixed(2) + "M";
   }
 
   var skippedGates = [];
 
   // Re-applied after every reset: a skipped gate is a fact about the feature's
-  // track, not about how far the replay has got.
+  // track, not about how much of the log has been applied.
   function applySkipped() {
     skippedGates.forEach(function (g) {
       var pill = gateRailEl.querySelector('.gate-pill[data-gate="' + g + '"]');
@@ -959,12 +1102,11 @@
     applySkipped();
     floorCaptionEl.innerHTML = "warming up the floor&hellip;";
     stepIndex = -1;
-    stepStart = performance.now();
   }
 
   // `at` is the event's own epoch ms, as recorded in history/events.jsonl. The
-  // feed reports when the thing actually happened, never when the replay drew
-  // it. A line with no recorded time reads "--:--:--" rather than borrowing the
+  // feed reports when the thing actually happened, never when the page drew it.
+  // A line with no recorded time reads "--:--:--" rather than borrowing the
   // clock — an invented timestamp is worse than a visibly missing one.
   function addTickerLine(kind, who, text, at) {
     var row = document.createElement("div");
@@ -991,7 +1133,10 @@
       '<span class="b ' + kind + '"></span>' +
       '<span class="m"><span class="agent">' + who + '</span> ' + text + '</span>';
     tickerEl.appendChild(row);
-    tickerEl.scrollTop = tickerEl.scrollHeight;
+    // The feed lives inside a tab body, and that is what scrolls. Setting
+    // scrollTop on the ticker itself would move nothing.
+    var scroller = tickerEl.parentElement || tickerEl;
+    scroller.scrollTop = scroller.scrollHeight;
     // A divider always precedes the rows it labels, so trimming from the head
     // can drop one; the rows that survive simply carry no day label, which is
     // what the feed did before day labels existed.
@@ -1072,7 +1217,6 @@
       }
     }
     if (s.caption) floorCaptionEl.innerHTML = s.caption;
-    if (s.current) currentLineEl.innerHTML = s.current;
     if (s.ticker) {
       s.ticker.forEach(function (t) {
         addTickerLine(t[0], t[1], t[2], t[3]);
@@ -1088,8 +1232,9 @@
       signoffCard.classList.add("show");
     }
     if (s.cycle) cycleNumEl.textContent = String(s.cycle);
-    // The counters show the ledger as it stood at this step, so a replay reports
-    // what was open at that moment rather than today's totals.
+    // The counters show the ledger as it stood at this step; applyState then
+    // overwrites them with the log's current tally, which is what the floor
+    // reports once it has caught up.
     if (s.issuesAt) {
       statBlocker.textContent = String(s.issuesAt.blocker);
       statMajor.textContent = String(s.issuesAt.major);
@@ -1097,41 +1242,28 @@
     }
   }
 
-  function nextStep(now) {
-    if (stepIndex + 1 >= SCRIPT.length) {
-      // Caught up with the log. Nothing loops here — an empty tail means the
-      // pipeline has not produced another event yet, which is a true statement
-      // about the run and the thing the old demo's restart was hiding.
-      if (!liveMode) {
-        liveMode = true;
-        setPlaying(true);
-        setStatus(status.kind, status.text);   // drop the "replaying" note
-      }
-      return;
-    }
+  function nextStep() {
+    // Caught up with the log. Nothing loops and nothing replays — an empty tail
+    // means the pipeline has not produced another event yet, which is a true
+    // statement about the run.
+    if (stepIndex + 1 >= SCRIPT.length) return;
     stepIndex++;
     if (stepIndex === 0) setGate(GATES[0], "active");
     applyStep(SCRIPT[stepIndex]);
-    stepStart = now;
   }
+
+  var lastClockTick = 0;
 
   function tick(now) {
     raf = requestAnimationFrame(tick);
-    if (liveMode) {
-      // Apply everything outstanding in one frame so the floor always shows the
-      // pipeline's actual position, not a re-enactment of how it got there.
-      var guard = 0;
-      while (stepIndex + 1 < SCRIPT.length && guard++ < 10000) nextStep(now);
-    } else if (playing) {
-      if (stepIndex < 0) nextStep(now);
-      else {
-        var s = SCRIPT[stepIndex];
-        // A step with no dur would never satisfy this comparison and would stall
-        // the replay in place, so the default is applied here rather than trusted
-        // to be present on every step handed in.
-        if (s && now - stepStart >= (s.dur || 1500) / speed) nextStep(now);
-      }
-    }
+    // Apply everything outstanding in one frame: the floor shows where the
+    // pipeline actually is, never a re-enactment of how it got there.
+    var guard = 0;
+    while (stepIndex + 1 < SCRIPT.length && guard++ < 10000) nextStep();
+    // Elapsed clocks advance between pushes. Four times a second is past the
+    // resolution anyone reads off a seconds counter and keeps the work off the
+    // frame budget.
+    if (now - lastClockTick > 250) { lastClockTick = now; updateClocks(); }
     draw(now);
   }
 
@@ -1262,6 +1394,20 @@
     ctx.fillStyle = present ? "#eef2f8" : "#66779a";
     ctx.fillText(desk.short, x - 2, y + 62);
 
+    // A desk the pipeline is about to reach. Nothing in the event log says this —
+    // it comes from the gate sequence — and without it the floor can only show
+    // what has already happened.
+    if (upNextDesks[id] && !desk.activeNow && vis === "idle") {
+      ctx.strokeStyle = "rgba(255,181,69,0.45)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(x - 10, y - 6, w + 20, 82);
+      ctx.setLineDash([]);
+      ctx.font = "8px 'Silkscreen', monospace";
+      ctx.fillStyle = "#8a6127";
+      ctx.fillText("NEXT", x + 2, y - 10);
+    }
+
     if (hovered) {
       ctx.strokeStyle = "#ffb545";
       ctx.lineWidth = 2;
@@ -1273,22 +1419,22 @@
 
   function draw(now) { drawDept(now); }
 
-  document.getElementById("btnPlay").addEventListener("click", function () {
-    setPlaying(!playing);
-  });
+  /* ---- panel tabs ---- */
 
-  document.getElementById("btnSpeed").addEventListener("click", function () {
-    speed = speed === 1 ? 2 : speed === 2 ? 0.5 : 1;
-    this.textContent = speed + "×";
-  });
+  var TABS = [
+    { btn: "tabBoard", pane: "paneBoard" },
+    { btn: "tabAgents", pane: "paneAgents" },
+    { btn: "tabFeed", pane: "paneFeed" }
+  ];
 
-  // Replay is now deliberate, not the default. It rewinds and animates through
-  // the same real steps, and hands back to live at the end.
-  document.getElementById("btnRestart").addEventListener("click", function () {
-    resetAll();
-    liveMode = false;
-    setPlaying(true);
-    setStatus(status.kind, status.text);
+  TABS.forEach(function (t) {
+    document.getElementById(t.btn).addEventListener("click", function () {
+      TABS.forEach(function (o) {
+        var on = o === t;
+        document.getElementById(o.btn).setAttribute("aria-selected", on ? "true" : "false");
+        document.getElementById(o.pane).hidden = !on;
+      });
+    });
   });
 
   /* ---- click-to-inspect ---- */
@@ -1325,6 +1471,8 @@
   var modalNow = document.getElementById("modalNow");
   var modalTime = document.getElementById("modalTime");
   var modalLog = document.getElementById("modalLog");
+  var modalTask = document.getElementById("modalTask");
+  var modalTokens = document.getElementById("modalTokens");
 
   var STATUS_COPY = {
     working: { cls: "st-working", text: "working" },
@@ -1345,15 +1493,30 @@
     modalDept.textContent = DEPT_LABEL_BY_ID[id] || d.dept;
     modalStatus.className = "modal-status " + status.cls;
     modalStatus.textContent = status.text;
+    var rosterRow = rosterByDesk[id] || null;
     modalNow.textContent = d.activeNow
-      ? (currentLineEl.textContent || "active this step")
+      ? ((rosterRow && rosterRow.task ? rosterRow.task + " — " : "") + "working now")
       : (vis === "resting" ? "finished its part — waiting for the rest of the cycle."
         : vis === "issue" ? "left an open finding — waiting on a fix."
-        : "hasn't been reached yet in this run.");
-    var worked = d.totalRealMs + (d.liveSince ? Date.now() - d.liveSince : 0);
+        : rosterRow && rosterRow.status === "queued"
+          ? "hasn't run yet — its gate is still ahead."
+          : "its gate has already passed or been skipped; it is not going to run.");
+    // The roster row is the builder's own tally for this desk — every run it has
+    // made in this feature, not just the step currently on screen.
+    var r = rosterByDesk[id] || null;
+    var worked = r ? r.totalMs : d.totalRealMs;
     modalTime.textContent = worked > 0
-      ? fmtDuration(worked) + (d.liveSince ? " and counting" : "")
+      ? fmtDuration(worked) + (r && r.liveSince && !snapshotMode ? " and counting" : "") +
+        (r && r.runs > 1 ? " across " + r.runs + " runs" : "")
       : "not started yet";
+    modalTask.textContent = (r && r.task) ? r.task
+      : (r && r.phase) ? r.phase
+      : (r && r.status === "queued") ? "queued — " + (r.gate || "no gate") + " has not run yet"
+      : "—";
+    modalTokens.textContent = r
+      ? fmtTokens(r.tokens) + (typeof r.tokens === "number" ? "" : "") +
+        (r && r.tokensMissing ? " · " + r.tokensMissing + " run(s) reported none" : "")
+      : "not reported";
 
     modalLog.innerHTML = "";
     if (!d.log.length) {
@@ -1370,14 +1533,13 @@
       });
     }
 
-    wasPlayingBeforeModal = playing;
-    setPlaying(false);
+    modalDeskId = id;
     modalEl.classList.add("show");
   }
 
   function closeAgentModal() {
     modalEl.classList.remove("show");
-    setPlaying(wasPlayingBeforeModal);
+    modalDeskId = null;
   }
 
   canvas.addEventListener("mousemove", function (evt) {
@@ -1431,9 +1593,7 @@
     status = { kind: kind, text: text };
     brandTagEl.textContent = (kind === "live" ? "live · " : "") + text;
     brandTagEl.style.color = kind === "live" ? "#5fd3a0" : kind === "bad" ? "#ff6b6b" : "";
-    protoTagEl.textContent = liveMode
-      ? text
-      : "replaying real events — it returns to live at the end";
+    protoTagEl.textContent = text;
   }
 
   function describe(st) {
@@ -1445,31 +1605,213 @@
 
   function applyState(st) {
     lastState = st;
+    renderNow(st);
+    renderBoard(st);
+    renderAgents(st);
+    renderFooter(st);
     if (st.empty) {
       floorCaptionEl.innerHTML = "no events in this feature&rsquo;s log yet &mdash; nothing has run.";
+      currentLineEl.textContent = "nothing has run yet";
       setStatus("wait", describe(st));
       return;
     }
     // If the prefix already on screen still matches, only the new tail needs
     // applying. If it changed under us (a resumed run re-deriving earlier steps),
-    // replaying a delta would be wrong — rebuild the floor from scratch.
+    // applying a delta would be wrong — rebuild the floor from scratch.
     skippedGates = st.skippedGates || [];
     applySkipped();
     var appendOnly = SCRIPT.length > 0 && st.steps.length >= SCRIPT.length && !changedInPlace(st.steps);
     SCRIPT = st.steps;
-    if (!appendOnly) {
-      resetAll();
-      liveMode = true;
-    }
+    if (!appendOnly) resetAll();
     cycleNumEl.textContent = String(st.cycle || 1);
-    // Issue counts are the log's current tally, not something accumulated by
-    // replaying steps — an issue opened in cycle 1 and verified in cycle 3 has
-    // to read as verified the moment the floor loads, replay or not.
+    // Issue counts are the log's current tally, not something accumulated step
+    // by step — an issue opened in cycle 1 and verified in cycle 3 has to read as
+    // verified the moment the floor loads.
     var iss = st.issues || { blocker: 0, major: 0, verified: 0 };
     statBlocker.textContent = String(iss.blocker);
     statMajor.textContent = String(iss.major);
     statVerified.textContent = String(iss.verified);
     setStatus(st.running ? "live" : "wait", describe(st));
+  }
+
+  /* ============================================================
+     PANELS — done, doing, remaining.
+
+     Everything here is rendered from the builder's state: the roster,
+     the task board, the gate plan and the token tallies are all
+     derived in build-floor.mjs, so this file never has to work out
+     what ran or what is left.
+     ============================================================ */
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function shortDesk(id) { return (id || "").replace(/^sdlc-/, ""); }
+
+  // Running agents, each with the elapsed time since its own phase_start. The
+  // builder cannot tell a running agent from an interrupted one — the log looks
+  // identical — so the wording stays "since phase_start", which is true of both.
+  function renderNow(st) {
+    var live = (st && st.nowRunning) || [];
+    nowListEl.innerHTML = "";
+    if (!live.length) {
+      currentLineEl.textContent = st && st.shipped ? "shipped — no agent running"
+        : (st && !st.empty ? "no agent running at the last event" : "nothing has run yet");
+      return;
+    }
+    currentLineEl.textContent = live.length === 1
+      ? "1 agent working" : live.length + " agents working concurrently";
+    live.forEach(function (r) {
+      var row = el("div", "now-row");
+      row.appendChild(el("span", "who", shortDesk(r.desk || r.agent)));
+      row.appendChild(el("span", "task", r.task ? r.task : (r.gate || r.phase)));
+      var elapsed = el("span", "el", fmtDuration(r.elapsedMs));
+      elapsed.dataset.since = String(r.startedAt);
+      row.appendChild(elapsed);
+      nowListEl.appendChild(row);
+    });
+  }
+
+  // Tasks first — what the work actually is — then every gate still ahead and
+  // the desks that will run it. "Up next" is the one thing no event can report:
+  // the log records what happened, never what is scheduled.
+  function renderBoard(st) {
+    boardRowsEl.innerHTML = "";
+    var tasks = (st && st.tasks) || [];
+    var plan = (st && st.plan) || [];
+    var upNext = (st && st.upNext) || [];
+
+    if (tasks.length) {
+      boardRowsEl.appendChild(el("div", "group-label", "workplan — " +
+        tasks.filter(function (t) { return t.status === "complete"; }).length + " of " + tasks.length + " complete"));
+      tasks.forEach(function (t) {
+        var row = el("div", "row");
+        row.appendChild(el("span", "name", t.id + (t.title ? " — " + t.title : "")));
+        var cls = t.status === "complete" ? "done"
+          : t.status === "running" ? "working"
+          : t.status === "blocked" ? "bad" : "queued";
+        row.appendChild(el("span", "chip " + cls, t.status));
+        var bits = [];
+        if (t.desk) bits.push(shortDesk(t.desk));
+        if (t.ms) bits.push(fmtDuration(t.ms));
+        if (typeof t.tokens === "number") bits.push(fmtTokens(t.tokens) + " tokens");
+        if (t.dependsOn && t.dependsOn.length) bits.push("after " + t.dependsOn.join(", "));
+        if (bits.length) row.appendChild(el("span", "meta", bits.join(" · ")));
+        boardRowsEl.appendChild(row);
+      });
+    }
+
+    boardRowsEl.appendChild(el("div", "group-label", "gates"));
+    plan.forEach(function (g) {
+      var row = el("div", "row");
+      row.appendChild(el("span", "name", g.gate));
+      var cls = g.status === "passed" ? "done" : g.status === "failed" ? "bad"
+        : g.status === "working" ? "working" : g.status === "skipped" ? "" : "queued";
+      row.appendChild(el("span", "chip " + cls, g.status));
+      var bits = [];
+      if (g.runs) bits.push(g.runs + (g.runs === 1 ? " run" : " runs"));
+      if (g.realMs) bits.push(fmtDuration(g.realMs) + " agent time");
+      if (typeof g.tokens === "number") bits.push(fmtTokens(g.tokens) + " tokens");
+      if (bits.length) row.appendChild(el("span", "meta", bits.join(" · ")));
+      boardRowsEl.appendChild(row);
+    });
+
+    if (upNext.length) {
+      boardRowsEl.appendChild(el("div", "group-label", "up next"));
+      upNext.forEach(function (n, i) {
+        var row = el("div", "row");
+        row.appendChild(el("span", "name", (i + 1) + ". " + n.gate));
+        row.appendChild(el("span", "meta", n.agents.map(shortDesk).join(", ")));
+        boardRowsEl.appendChild(row);
+      });
+    }
+
+    if (!tasks.length && !plan.length) {
+      boardRowsEl.appendChild(el("div", "empty-note", "no workplan or gate record yet."));
+    }
+  }
+
+  // Every desk on the floor: what it did, how long it took, what it cost, and
+  // whether the pipeline is still going to reach it.
+  function renderAgents(st) {
+    agentRowsEl.innerHTML = "";
+    var roster = (st && st.roster) || [];
+    rosterByDesk = {};
+    upNextDesks = {};
+    roster.forEach(function (r) { rosterByDesk[r.desk] = r; });
+    var next = (st && st.upNext && st.upNext[0]) || null;
+    if (next) next.agents.forEach(function (d) { upNextDesks[d] = true; });
+
+    var ORDER = { working: 0, done: 1, queued: 2, idle: 3 };
+    var LABEL = { working: "working", done: "done", queued: "queued", idle: "not run" };
+    var groups = ["working", "done", "queued", "idle"];
+    var any = false;
+    groups.forEach(function (g) {
+      var rows = roster.filter(function (r) { return r.status === g; })
+        .sort(function (a, b) { return (ORDER[a.status] - ORDER[b.status]) || (b.totalMs - a.totalMs); });
+      if (!rows.length) return;
+      any = true;
+      agentRowsEl.appendChild(el("div", "group-label",
+        LABEL[g] + " — " + rows.length + (g === "queued" ? " still to run" : "")));
+      rows.forEach(function (r) {
+        var row = el("div", "row");
+        row.appendChild(el("span", "name", shortDesk(r.desk)));
+        var cls = r.status === "working" ? "working" : r.status === "done" ? "done"
+          : r.status === "queued" ? "queued" : "";
+        row.appendChild(el("span", "chip " + cls, r.gate || "—"));
+        var bits = [];
+        if (r.runs) bits.push(r.runs + (r.runs === 1 ? " run" : " runs"));
+        if (r.totalMs) bits.push(fmtDuration(r.totalMs) + (r.liveSince && !snapshotMode ? " and counting" : ""));
+        bits.push(fmtTokens(r.tokens) + (typeof r.tokens === "number" ? " tokens" : ""));
+        if (r.tokensMissing) bits.push(r.tokensMissing + " run(s) unreported");
+        if (r.task) bits.push(r.task);
+        row.appendChild(el("span", "meta", bits.join(" · ")));
+        agentRowsEl.appendChild(row);
+      });
+    });
+    if (!any) agentRowsEl.appendChild(el("div", "empty-note", "no desks have run yet."));
+  }
+
+  function renderFooter(st) {
+    if (!st || st.empty) {
+      outElapsed.textContent = outAgentTime.textContent = outTokens.textContent = outRuns.textContent = "—";
+      return;
+    }
+    outElapsed.textContent = fmtDuration(st.wallClockMs || 0);
+    // Sum of every agent's own duration, which is larger than elapsed whenever
+    // anything ran concurrently. Never conflate the two (protocol section 3).
+    outAgentTime.textContent = fmtDuration(st.sumAgentMs || 0);
+    var tk = st.tokens || {};
+    outTokens.textContent = tk.reportedRuns
+      ? fmtTokens(tk.total) + (tk.reportedRuns < tk.totalRuns
+        ? " (" + tk.reportedRuns + "/" + tk.totalRuns + " runs reported)" : "")
+      : "not reported";
+    outRuns.textContent = String(tk.totalRuns || 0);
+  }
+
+  // The only thing that moves between pushes: elapsed clocks on running work.
+  function updateClocks() {
+    if (snapshotMode) return;
+    var now = Date.now();
+    var rows = nowListEl.querySelectorAll(".el");
+    for (var i = 0; i < rows.length; i++) {
+      var since = Number(rows[i].dataset.since);
+      if (isFinite(since)) rows[i].textContent = fmtDuration(Math.max(0, now - since));
+    }
+    if (modalDeskId) {
+      var r = rosterByDesk[modalDeskId];
+      // totalMs already counts the running run up to the moment the state was
+      // built; carry it forward from there rather than from phase_start, or the
+      // completed runs before it get counted twice.
+      if (r && r.liveSince) {
+        modalTime.textContent = fmtDuration(r.totalMs +
+          Math.max(0, now - (lastState ? lastState.generatedAt : now))) + " and counting";
+      }
+    }
   }
 
   // Cheap identity check on the prefix already applied: same desks, same states.
@@ -1487,6 +1829,7 @@
     // the static build inlines its snapshot instead. It is a snapshot, and the
     // header says so rather than implying it is tracking anything.
     if (window.FLOOR_STATE) {
+      snapshotMode = true;
       applyState(window.FLOOR_STATE);
       setStatus("wait", "snapshot · " + describe(window.FLOOR_STATE) + " — not tracking");
       return;
