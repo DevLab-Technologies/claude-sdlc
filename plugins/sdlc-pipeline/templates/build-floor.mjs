@@ -237,14 +237,11 @@ function pairRuns(events, gaps) {
     }
   }
 
-  // Anything still open at the end of the log is rendered as still working,
-  // frozen at the log's last state. Protocol 3a calls an unpaired phase_start an
-  // interrupted run, and from the log alone the two are indistinguishable — so
-  // show the desk as working and say which it might be, rather than inventing a
-  // run_complete that never happened.
+  // Anything still open at the end of the log is a run with no run_complete.
+  // Whether it is live or interrupted is decided by classifyOpenRuns below, which
+  // can often tell from what the rest of the log did afterwards.
   for (const [, queue] of open) {
     for (const start of queue) {
-      gaps.push(`${start.agent} in ${start.phase} (cycle ${start.cycle ?? 1}): phase_start with no run_complete — shown as still working; it is either running now or was interrupted.`);
       runs.push(makeRun(start, null, gaps));
     }
   }
@@ -285,6 +282,50 @@ function makeRun(start, complete, gaps) {
     tokens: typeof complete?.tokens === "number" ? complete.tokens : null,
     model: complete?.model || start.model || null,
   };
+}
+
+/* ============================================================
+   CLASSIFY — running now, or interrupted and never closed
+   ============================================================ */
+
+// An unpaired phase_start is either an agent working this second or a run whose
+// session died (protocol 3a). Rendering every one as "working" is how a floor
+// ends up claiming sixteen concurrent agents, four of them for days.
+//
+// The log cannot say directly, but twice it says so by implication:
+//
+//   1. the run belongs to a cycle older than the current one — opening the next
+//      cycle closed that one, and nothing in a closed cycle is still working;
+//   2. a gate outcome for the run's own phase and cycle was recorded after it
+//      started — the phase reached a verdict without it.
+//
+// Anything neither rule catches is treated as live, which is the only safe
+// default: calling a working agent dead would hide the thing the floor exists
+// to show.
+function classifyOpenRuns(runs, events, currentCycle, gaps) {
+  const gateEvents = events.filter((e) => e.event === "gate_passed" || e.event === "gate_failed");
+  const stalled = [];
+  let live = 0;
+  for (const r of runs) {
+    if (!r.running) continue;
+    const cycle = r.cycle ?? 1;
+    let why = null;
+    if (cycle < currentCycle) {
+      why = `cycle ${cycle} closed while it was still open`;
+    } else {
+      const g = gateEvents.find((e) => e.phase === r.phase && (e.cycle ?? 1) === cycle && e._t > r.start);
+      if (g) why = `the ${r.phase} gate was recorded ${g.event === "gate_failed" ? "failed" : "passed"} while it was still open`;
+    }
+    if (why) { r.stalled = true; r.stalledWhy = why; stalled.push(r); }
+    else live++;
+  }
+  for (const r of stalled) {
+    gaps.push(`${r.agent} in ${r.phase} (cycle ${r.cycle ?? 1}): phase_start with no run_complete, and ${r.stalledWhy} — shown as stalled, not working. Its time is not counted.`);
+  }
+  if (live) {
+    gaps.push(`${live} run(s) have a phase_start with no run_complete and nothing in the log that closed them — shown as working. From the log alone, running now and interrupted a moment ago look identical.`);
+  }
+  return stalled.length;
 }
 
 /* ============================================================
@@ -343,7 +384,13 @@ function loadSignoffs(runsDir) {
       .find((l) => /NOT verified/i.test(l));
     if (!line) continue;
     if (!byAgent.has(agent)) byAgent.set(agent, []);
-    byAgent.get(agent).push({ ts: Date.parse(m[1].replace(/-/g, ":").replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3")) || 0, text: line.replace(/^[-*]\s*/, "") });
+    // The card already prints a "NOT verified —" label, and agents write the line
+    // as "NOT verified: I did not run make test". Keeping both renders the words
+    // twice in a row, which reads as a rendering fault rather than a caveat.
+    const caveat = line
+      .replace(/^[-*]\s*/, "")
+      .replace(/^\**\s*NOT\s+verified\**\s*[:\u2014-]?\s*/i, "");
+    byAgent.get(agent).push({ ts: Date.parse(m[1].replace(/-/g, ":").replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3")) || 0, text: caveat || line.replace(/^[-*]\s*/, "") });
   }
   for (const list of byAgent.values()) list.sort((a, b) => a.ts - b.ts);
   return byAgent;
@@ -365,12 +412,16 @@ function buildState(root, slug) {
     return { slug, empty: true, generatedAt: now,
       gaps: [`no events in ${logPath} — nothing has run yet.`],
       steps: [], desks: {}, plan: [], upNext: [], roster: [], tasks: [], nowRunning: [],
-      gateStatus: {}, skippedGates: [], gates: GATES,
+      gateStatus: {}, skippedGates: [], gates: GATES, stalled: 0,
       tokens: { total: 0, reportedRuns: 0, totalRuns: 0 } };
   }
 
   const issueMeta = loadIssueMeta(featureDir);
   const runs = pairRuns(events, gaps);
+  // The current cycle is needed before the steps are built: it decides which
+  // open runs are live and which the pipeline left behind.
+  const cycles = Math.max(1, ...events.map((e) => e.cycle ?? 1));
+  const stalledCount = classifyOpenRuns(runs, events, cycles, gaps);
   attachTokens(runs, events, gaps);
   const clusters = groupRuns(runs, now);
   const signoffs = loadSignoffs(runsDir);
@@ -460,7 +511,7 @@ function buildState(root, slug) {
 
     const startedAt = Math.min(...cluster.map((r) => r.start));
     const endedAtRaw = cluster.every((r) => r.end != null) ? Math.max(...cluster.map((r) => r.end)) : null;
-    const live = cluster.some((r) => r.running);
+    const live = cluster.some((r) => r.running && !r.stalled);
 
     const desks = [];
     const real = {};
@@ -508,7 +559,10 @@ function buildState(root, slug) {
       // back last week's timestamps.
       ticker.push(["start", who, "phase_start", run.start]);
       if (!run.running) {
-        const tail = run.artifacts.length ? " → " + run.artifacts.join(", ") : "";
+        // A review synthesis can name thirty issue files. Listing them all turns
+        // one feed line into a paragraph and buries the summary that follows it;
+        // the artifacts are on disk, and the count is what a reader needs here.
+        const tail = run.artifacts.length ? " → " + summariseArtifacts(run.artifacts) : "";
         const kind = (gateEvent?.event === "gate_failed" || blocker) ? "bad" : "done";
         const cost = typeof run.tokens === "number" ? ` · ${fmtTokens(run.tokens)} tokens` : "";
         ticker.push([kind, who, "run_complete" + (run.task ? ` (${run.task})` : "") + tail +
@@ -594,8 +648,10 @@ function buildState(root, slug) {
 
   const firstTs = events[0]._t;
   const lastTs = events[events.length - 1]._t;
-  const anyRunning = runs.some((r) => r.running);
-  const cycles = Math.max(1, ...events.map((e) => e.cycle ?? 1));
+  // Stalled runs are not running, whatever their missing run_complete implies.
+  // Counting them here is what kept a header reading "pipeline running" on a
+  // feature whose last real activity was days earlier.
+  const anyRunning = runs.some((r) => r.running && !r.stalled);
   if (cycles > 2) {
     gaps.push(`this feature reached cycle ${cycles}; the floor's cycle badge shows the real number, but the gate rail only reflects the latest cycle's outcomes.`);
   }
@@ -674,6 +730,7 @@ function buildState(root, slug) {
     sumAgentMs,
     issues,
     tokens,
+    stalled: stalledCount,
     gates: GATES,
     skippedGates: skipped,
     gateStatus,
@@ -692,6 +749,13 @@ function buildState(root, slug) {
 function stepRealMs(real) {
   const vals = Object.keys(real).map((k) => real[k] || 0);
   return vals.length ? Math.max(...vals) : 0;
+}
+
+// First few paths, then a count. Three is enough to see which phase directory the
+// run wrote into, which is all the feed is being asked.
+function summariseArtifacts(list) {
+  if (list.length <= 3) return list.join(", ");
+  return list.slice(0, 3).join(", ") + ` + ${list.length - 3} more`;
 }
 
 // Same thousands form the floor's own panels use, so a feed line and a desk row
@@ -968,7 +1032,8 @@ function buildRoster(runs, gateStatus, now) {
   const rows = [];
   for (const deskId of DESK_IDS) {
     const mine = runs.filter((r) => r._desk === deskId);
-    const running = mine.find((r) => r.running) || null;
+    const running = mine.find((r) => r.running && !r.stalled) || null;
+    const stalledRuns = mine.filter((r) => r.stalled);
     const done = mine.filter((r) => !r.running);
     const recent = running || (done.length ? done[done.length - 1] : null);
     // sdlc-qa-functional has no fixed gate — it plans in phase 6 and executes in
@@ -979,6 +1044,9 @@ function buildRoster(runs, gateStatus, now) {
     const last = done.length ? done[done.length - 1] : null;
     let status;
     if (running) status = "working";
+    // A desk with an unclosed run ranks above its finished ones: something it
+    // started was never accounted for, and that is the fact worth surfacing.
+    else if (stalledRuns.length) status = "stalled";
     else if (mine.length) status = "done";
     else if (ON_DEMAND_DESKS.has(deskId)) status = "idle";
     else if (gate && (gateStatus[gate] === "passed" || gateStatus[gate] === "skipped")) status = "idle";
@@ -986,6 +1054,8 @@ function buildRoster(runs, gateStatus, now) {
     rows.push({
       desk: deskId, gate, status,
       runs: mine.length,
+      stalledRuns: stalledRuns.length,
+      stalledWhy: stalledRuns.length ? stalledRuns[stalledRuns.length - 1].stalledWhy : null,
       // Clamped: a phase_start timestamped slightly ahead of this machine's clock
       // would otherwise render as negative elapsed time, which reads as a bug in
       // the floor rather than as the clock skew it is.
@@ -1007,7 +1077,7 @@ function buildRoster(runs, gateStatus, now) {
 // being worked, and — the part no event can tell you — what is still to come and
 // who will do it.
 function buildPlan(gateStatus, runs, skipped, now) {
-  const runningGates = new Set(runs.filter((r) => r.running)
+  const runningGates = new Set(runs.filter((r) => r.running && !r.stalled)
     .map((r) => AGENT_GATE[r.agent] || PHASE_GATE[r.phase]).filter(Boolean));
   const rows = GATES.map((g) => {
     const mine = runs.filter((r) => (AGENT_GATE[r.agent] || PHASE_GATE[r.phase]) === g);
@@ -1040,7 +1110,7 @@ function buildPlan(gateStatus, runs, skipped, now) {
 // unpaired phase_starts, which is also why the floor cannot tell "running" from
 // "interrupted" — both look exactly like this in the log.
 function buildNow(runs, now) {
-  return runs.filter((r) => r.running).map((r) => ({
+  return runs.filter((r) => r.running && !r.stalled).map((r) => ({
     agent: r.agent, desk: r._desk || null, phase: r.phase, cycle: r.cycle,
     gate: AGENT_GATE[r.agent] || PHASE_GATE[r.phase] || null,
     task: r.task, model: r.model,
@@ -1113,7 +1183,7 @@ function serve(root, slug, port) {
       // a workplan landing, a task record flipping to complete, a gate reset in
       // state.json. Leaving them out of the fingerprint is what would make the
       // page sit on a stale task list while claiming to be live.
-      plan: s.plan, tasks: s.tasks, tokens: s.tokens,
+      plan: s.plan, tasks: s.tasks, tokens: s.tokens, stalled: s.stalled,
       roster: (s.roster || []).map((r) => r.desk + ":" + r.status + ":" + r.runs + ":" + r.tokens),
     });
   }
