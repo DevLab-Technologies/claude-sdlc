@@ -707,6 +707,16 @@
 
     /* Compact the fixed blocks so the feed — the part that actually changes —
        keeps the room it needs. */
+    /* Stacked, the floor's height follows the viewport WIDTH (8:5 at
+       width: max(100%, 34dvh*8/5)), so a short, wide window leaves the panel
+       almost nothing. Squeezing a flex:1 tab body then collapses it to zero and
+       the board, agents and feed become unreachable — there is no scroll to
+       reach a box with no height. So the column scrolls as a whole here, and
+       the tab body keeps a floor under it rather than absorbing the shortfall. */
+    aside { overflow-y: auto; }
+    .panel-scroll { flex: 0 0 auto; }
+    .tab-body { min-height: 200px; }
+
     .panel-block { padding: 9px 12px; }
     .current-line { font-size: 12px; }
     .stat { padding: 6px 6px 5px; }
@@ -1133,14 +1143,22 @@
       '<span class="b ' + kind + '"></span>' +
       '<span class="m"><span class="agent">' + who + '</span> ' + text + '</span>';
     tickerEl.appendChild(row);
-    // The feed lives inside a tab body, and that is what scrolls. Setting
-    // scrollTop on the ticker itself would move nothing.
-    var scroller = tickerEl.parentElement || tickerEl;
-    scroller.scrollTop = scroller.scrollHeight;
+    scrollFeedToEnd();
     // A divider always precedes the rows it labels, so trimming from the head
     // can drop one; the rows that survive simply carry no day label, which is
     // what the feed did before day labels existed.
     while (tickerEl.children.length > 60) tickerEl.removeChild(tickerEl.firstChild);
+  }
+
+  // The feed lives inside a tab body, and that is what scrolls — setting
+  // scrollTop on the ticker itself would move nothing. While the pane is hidden
+  // its scrollHeight is 0, so the assignment is a no-op and the feed would open
+  // parked on its oldest line; the tab switch calls this again once the pane is
+  // on screen and can actually be scrolled.
+  function scrollFeedToEnd() {
+    var scroller = tickerEl.parentElement || tickerEl;
+    if (scroller.hidden || !scroller.clientHeight) return;
+    scroller.scrollTop = scroller.scrollHeight;
   }
 
   function setGate(name, cls) {
@@ -1434,6 +1452,9 @@
         document.getElementById(o.btn).setAttribute("aria-selected", on ? "true" : "false");
         document.getElementById(o.pane).hidden = !on;
       });
+      // Now that the pane has a height, park it on the newest line — every
+      // append while it was hidden could not scroll it.
+      if (t.pane === "paneFeed") scrollFeedToEnd();
     });
   });
 
@@ -1693,7 +1714,10 @@
         row.appendChild(el("span", "name", t.id + (t.title ? " — " + t.title : "")));
         var cls = t.status === "complete" ? "done"
           : t.status === "running" ? "working"
-          : t.status === "blocked" ? "bad" : "queued";
+          : t.status === "blocked" ? "bad"
+          // "unknown" is a task that ran to completion with no record behind it.
+          // It is not queued, so it must not wear the queued chip.
+          : t.status === "unknown" ? "" : "queued";
         row.appendChild(el("span", "chip " + cls, t.status));
         var bits = [];
         if (t.desk) bits.push(shortDesk(t.desk));
@@ -1809,7 +1833,8 @@
       // completed runs before it get counted twice.
       if (r && r.liveSince) {
         modalTime.textContent = fmtDuration(r.totalMs +
-          Math.max(0, now - (lastState ? lastState.generatedAt : now))) + " and counting";
+          Math.max(0, now - (lastState ? lastState.generatedAt : now))) + " and counting" +
+          (r.runs > 1 ? " across " + r.runs + " runs" : "");
       }
     }
   }

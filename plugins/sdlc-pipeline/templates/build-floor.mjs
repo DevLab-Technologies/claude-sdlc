@@ -99,6 +99,11 @@ const GATE_AGENTS = {
   "release": ["sdlc-release-gate"],
 };
 
+// Desks nothing schedules. The debugger runs only when triage sends it a defect,
+// so a feature that never fails a gate never runs one — showing its desk as
+// "queued" would assert a run that nothing is going to launch.
+const ON_DEMAND_DESKS = new Set(["sdlc-debugger"]);
+
 // Agents with no fixed gate — they run against whichever gate is currently
 // contested. Resolved at grouping time from the most recent gate_failed.
 const FLOATING_AGENTS = new Set(["sdlc-debugger", "sdlc-implementer"]);
@@ -614,14 +619,25 @@ function buildState(root, slug) {
   const wallClockMs = (shipped?.duration_ms)
     ?? (Math.max(anyRunning ? Date.now() : lastTs, lastTs) - firstTs);
 
-  // Gate status: state.json's own map, with an outcome the log recorded taking
-  // precedence only where state.json has nothing to say. state.json is the
-  // pipeline's claim about the gates; the log is what happened to them.
+  // Gate status: state.json's map, overruled by any outcome the log recorded in
+  // the current cycle. state.json is the pipeline's claim about the gates; the
+  // log is what happened to them, and the log wins — an agent appends
+  // gate_failed before it updates state.json, and a session that dies between
+  // the two would otherwise leave the board reporting the stale "passed" while
+  // the gate rail beside it paints the same gate red.
+  //
+  // Only the current cycle's events overrule: opening cycle n+1 resets gates to
+  // pending in state.json, and an outcome from a closed cycle is not a claim
+  // about this one.
   const gateStatus = readStateGates(featureDir);
   for (const g of gateEvents) {
     const gate = PHASE_GATE[g.phase] || AGENT_GATE[g.agent];
     if (!gate) continue;
-    if (!gateStatus[gate]) gateStatus[gate] = g.event === "gate_failed" ? "failed" : "passed";
+    if ((g.cycle ?? 1) !== cycles) {
+      if (!gateStatus[gate]) gateStatus[gate] = g.event === "gate_failed" ? "failed" : "passed";
+      continue;
+    }
+    gateStatus[gate] = g.event === "gate_failed" ? "failed" : "passed";
   }
   skipped.forEach((g) => { gateStatus[g] = "skipped"; });
 
@@ -631,11 +647,16 @@ function buildState(root, slug) {
   const { plan, upNext } = buildPlan(gateStatus, runs, skipped, now);
   const nowRunning = buildNow(runs, now);
 
-  const tokenRuns = runs.filter((r) => typeof r.tokens === "number");
+  // Both halves of the coverage ratio count completed runs, and the total sums
+  // the same set. A run_usage written for a run whose run_complete has not landed
+  // — or never will, because it was interrupted — would otherwise be counted in
+  // the numerator only, printing a ratio like "7 of 6 runs reported".
+  const doneRuns = runs.filter((r) => !r.running);
+  const tokenRuns = doneRuns.filter((r) => typeof r.tokens === "number");
   const tokens = {
     total: tokenRuns.reduce((a, r) => a + r.tokens, 0),
     reportedRuns: tokenRuns.length,
-    totalRuns: runs.filter((r) => !r.running).length,
+    totalRuns: doneRuns.length,
   };
 
   return {
@@ -857,7 +878,7 @@ function loadTasks(featureDir, gaps) {
         stories: list("stories"),
         dependsOn: list("depends_on"),
         parallelWith: list("parallel_with"),
-        status: "pending",
+        status: "pending", recorded: false,
         desk: null, startedAt: null, endedAt: null, ms: 0, tokens: null, running: false,
       });
     }
@@ -880,10 +901,12 @@ function loadTasks(featureDir, gaps) {
         // rather than dropping it, and say where it came from.
         gaps.push(`${id} has an implementation record but no entry in 05-architecture/workplan.md — shown on the board from the task record alone.`);
         t = { id, title: "", ownerRole: null, stories: [], dependsOn: [], parallelWith: [],
-          status: "pending", desk: null, startedAt: null, endedAt: null, ms: 0, tokens: null, running: false };
+          status: "pending", recorded: false,
+          desk: null, startedAt: null, endedAt: null, ms: 0, tokens: null, running: false };
         tasks.push(t); byId.set(id, t);
       }
-      t.status = status === "complete" ? "complete" : status;   // partial | blocked | complete
+      t.status = status;                       // complete | partial | blocked
+      t.recorded = true;                       // a record exists, so the status is real
     }
   }
   return tasks;
@@ -911,6 +934,18 @@ function attachTaskRuns(tasks, runs, gaps) {
   if (unattributed) {
     gaps.push(`${unattributed} implementer run(s) named no task — the board cannot say which workplan task they built, so they appear only on the desks.`);
   }
+  // A task whose run started and finished, with no 07-implementation/TASK-<NNN>.md
+  // behind it, has an outcome nobody recorded. Leaving it "pending" states the
+  // opposite of what the log shows — the row would read "never started" while
+  // carrying the time and tokens of a completed run — and undercounts the board's
+  // "N of M complete".
+  const unrecorded = tasks.filter((t) => !t.recorded && !t.running && t.endedAt != null);
+  for (const t of unrecorded) {
+    t.status = "unknown";
+  }
+  if (unrecorded.length) {
+    gaps.push(`${unrecorded.length} task(s) ran to completion with no 07-implementation/TASK-<NNN>.md behind them — the board shows them "unknown", since the log proves the run finished but nothing records what it produced.`);
+  }
 }
 
 /* ============================================================
@@ -937,6 +972,7 @@ function buildRoster(runs, gateStatus, now) {
     let status;
     if (running) status = "working";
     else if (mine.length) status = "done";
+    else if (ON_DEMAND_DESKS.has(deskId)) status = "idle";
     else if (gate && (gateStatus[gate] === "passed" || gateStatus[gate] === "skipped")) status = "idle";
     else status = "queued";
     rows.push({
