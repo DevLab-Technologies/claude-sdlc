@@ -1156,9 +1156,23 @@
   // parked on its oldest line; the tab switch calls this again once the pane is
   // on screen and can actually be scrolled.
   function scrollFeedToEnd() {
-    var scroller = tickerEl.parentElement || tickerEl;
-    if (scroller.hidden || !scroller.clientHeight) return;
-    scroller.scrollTop = scroller.scrollHeight;
+    // Which element actually scrolls depends on the layout: the tab body in the
+    // desktop split, the whole panel column once it stacks and the body grows to
+    // its content. Walk up to the first ancestor that can scroll — setting
+    // scrollTop on one that cannot move is what left the feed parked on an old
+    // line while new events piled up below the fold.
+    var node = tickerEl.parentElement;
+    while (node) {
+      // Hidden means the feed tab is not the selected one. Nothing to scroll,
+      // and scrolling an ancestor would yank a reader off the board tab.
+      if (node.hidden) return;
+      if (node.scrollHeight > node.clientHeight + 1) {
+        node.scrollTop = node.scrollHeight;
+        return;
+      }
+      if (node.tagName === "ASIDE") return;
+      node = node.parentElement;
+    }
   }
 
   function setGate(name, cls) {

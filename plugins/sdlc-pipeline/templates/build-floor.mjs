@@ -894,7 +894,11 @@ function loadTasks(featureDir, gaps) {
       try { text = fs.readFileSync(path.join(implDir, name), "utf8"); } catch { continue; }
       const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
       const id = (fm && (fm[1].match(/^task:\s*(\S+)/m) || [])[1]) || name.replace(/\.md$/, "");
-      const status = (fm && (fm[1].match(/^status:\s*(\w+)/m) || [])[1]) || "complete";
+      // No status to read means no outcome was recorded — an empty file, or one
+      // whose frontmatter block was never closed, which is exactly the partial
+      // artifact protocol 3a quarantines. Defaulting it to "complete" reported
+      // an interrupted write as finished work.
+      const status = fm && (fm[1].match(/^status:\s*(\w+)/m) || [])[1];
       let t = byId.get(id);
       if (!t) {
         // A task record with no workplan entry still describes real work; show it
@@ -904,6 +908,10 @@ function loadTasks(featureDir, gaps) {
           status: "pending", recorded: false,
           desk: null, startedAt: null, endedAt: null, ms: 0, tokens: null, running: false };
         tasks.push(t); byId.set(id, t);
+      }
+      if (!status) {
+        gaps.push(`${id}: 07-implementation/${name} carries no readable status frontmatter — the record is empty or partial, so the board cannot say what the task produced.`);
+        continue;
       }
       t.status = status;                       // complete | partial | blocked
       t.recorded = true;                       // a record exists, so the status is real
@@ -944,7 +952,7 @@ function attachTaskRuns(tasks, runs, gaps) {
     t.status = "unknown";
   }
   if (unrecorded.length) {
-    gaps.push(`${unrecorded.length} task(s) ran to completion with no 07-implementation/TASK-<NNN>.md behind them — the board shows them "unknown", since the log proves the run finished but nothing records what it produced.`);
+    gaps.push(`${unrecorded.length} task(s) ran to completion with no usable outcome behind them — 07-implementation/TASK-<NNN>.md is missing or unreadable — so the board shows them "unknown": the log proves the run finished, but nothing records what it produced.`);
   }
 }
 

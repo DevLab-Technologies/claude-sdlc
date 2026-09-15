@@ -97,8 +97,10 @@ What it does need is honesty about coverage:
 - If no run in the whole log carries usage, say so once, drop the token columns entirely, and report
   timing alone. Do not print a table of dashes.
 
-Format token counts the way the floor does — `840`, `41k`, `1.2M`, at most one decimal place — and
-keep the raw integers for sorting and summing.
+Format token counts the way the floor does — `840` under a thousand, `41k` and `4.1k` in thousands,
+`1.20M` in millions — and keep the raw integers for sorting and summing. Match that spelling exactly:
+the point of this section is that a figure on the page and the same figure in this report read
+identically.
 
 ## Step 3 — Build the four views
 
