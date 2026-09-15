@@ -61,6 +61,10 @@ touching auth is `standard` at minimum even if its slice is two files.
 Run the local cycle exactly as `/sdlc` does from phase 7 onward, in this repo:
 
 1. `sdlc-implementer` per task, each handed its assigned `TC` ids from `tasks.md`.
+   - **The group that shares a tree is the one inside this repo.** Implementers here are scoped and
+     joined exactly as phase 7 is anywhere (protocol 9b); the cross-repo exemption in that section is
+     about implementers in *other* participants' repos, who share nothing with yours. Tell each one
+     which it is, or it will guess.
    - **Consumers do not wait for the provider.** Build against the published contract using a mock or
      stub derived from it — a contract precise enough to build a mock from is the point of publishing.
      Record what you mocked in `handoff.md`, because integration QA needs to know what has never met the

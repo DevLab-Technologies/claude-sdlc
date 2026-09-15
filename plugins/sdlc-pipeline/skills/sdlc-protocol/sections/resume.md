@@ -14,6 +14,12 @@ Loaded by `/sdlc-resume` and the orchestrator. Core protocol section 3a covers t
 | Parallel group with some members unpaired | only those members were interrupted | re-run **only** those; completed reports stand |
 | Working tree has edits not listed in a `## Fixed inline` section | the lead was interrupted mid-fix | inspect the diff, then either record or revert those edits before continuing |
 
+**One artifact does not prove its phase ran.** `08-review/cycle-<n>/verification.md` can exist with
+the review gate still `pending` and nothing wrong: its fast stage is also the join that compiles the
+tree after a parallel implementation group (section 9b), so it is routinely written while phase 7 is
+still the current phase. Row 3 above is about a phase's **own** completing artifact — for the review
+gate that is the lead's `review-summary.md` sign-off, never `verification.md`.
+
 Discard means move it aside, not delete it: rename to `<name>.interrupted-<ts>.md` so the evidence
 survives. A partial report can still show what an interrupted agent was seeing.
 

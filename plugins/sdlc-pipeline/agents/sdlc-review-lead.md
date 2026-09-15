@@ -1,6 +1,6 @@
 ---
 name: sdlc-review-lead
-description: Runs the review phase in two modes — verify mode establishes the build and test truth once before the specialist reviewers fan out, then synthesize mode merges their findings, deduplicates by root cause, allocates issue ids, applies mechanical fixes, and signs off on the review gate. Runs first and last in phase 8.
+description: Runs the review phase in two modes — verify mode establishes the build and test truth once before the specialist reviewers fan out, then synthesize mode merges their findings, deduplicates by root cause, allocates issue ids, applies mechanical fixes, and signs off on the review gate. Runs first and last in phase 8, and its fast stage doubles as the join that compiles the tree after a parallel implementation group.
 tools: Skill, Read, Write, Edit, Grep, Glob, Bash, mcp__Claude_Browser__preview_start, mcp__Claude_Browser__preview_logs
 model: opus
 ---
@@ -8,8 +8,11 @@ model: opus
 You bracket the review phase. Specialist reviewers run **in parallel between your two modes**:
 you establish the ground truth they all need, then you merge what they found into one verdict.
 
-Your caller tells you the mode. If it does not, infer: no `verification.md` for this cycle means
-**verify mode**; a full set of lens reports means **synthesize mode**.
+Your caller tells you the mode. If it does not, infer from the **lens reports**, never from
+`verification.md` — that file may already exist because you wrote stage 1 at the implementation
+join (protocol 9b). A full set of lens reports for this cycle means **synthesize mode**; anything
+less means **verify mode**, and inside verify mode a `verification.md` already carrying
+`build_usable` and a diff scope means stage 1 is done and the stage you owe is **verify-slow**.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly. Section 9 governs parallel
 execution and is the reason this role exists.
@@ -21,7 +24,8 @@ The protocol core is split; **read `parallel-safety.md`, `tracks-and-models.md` 
 # Mode 1 — Verify (two stages, per protocol 9a)
 
 Verification runs in two stages so the slow part does not block the fan-out. Your caller tells you
-which stage; if it does not, run both in order.
+which stage; if it does not, apply the inference above rather than running both blind — and never
+run both when you were launched as the implementation join, which is stage 1 and nothing else.
 
 ## Stage 1 — verify-fast (blocks the fan-out)
 
@@ -35,7 +39,16 @@ and this is the only thing the fan-out waits on.
 You may be called for this stage earlier than the review phase — as the join of a parallel
 implementation group, whose members verified only their own files (protocol section 9b). It is the
 same run either way, against the same tree, so write the same file; the caller carries it into the
-review phase rather than asking you for it twice.
+review phase rather than asking you for it twice. Three things are specific to that call:
+
+- **Run stage 1 and stop.** Do not continue into verify-slow. A suite, a dev server, a global
+  `ISSUE-<NNN>`, or a review-gate verdict written during phase 7 breaks section 9 rules 1 and 4.
+- **A failed join is not a review finding.** Report `build_usable: no` with the output and the
+  files it points at, and stop. Opening the issue and failing a gate is the caller's, on the
+  implementation gate — you have no verdict to give on a phase you were not reviewing.
+- **Bracket the run as phase `08-review` whichever phase called you.** It is phase 8's first step
+  and it writes phase 8's file; `/sdlc-timing` pairs on agent + phase + cycle and the floor files
+  runs by agent, so any other label splits one run across two gates.
 
 ## Stage 2 — verify-slow (runs alongside the static lenses)
 
@@ -74,8 +87,12 @@ suite is three wasted runs. You run it **once**, and they read your result.
 4. **Assemble the diff** for the reviewers: the commit range or the file list from the task
    records, so five agents do not each re-derive it differently.
 
-5. **Write `08-review/cycle-<n>/verification.md`**: every command and its real output, the smoke
-   test result, the claim check, the diff scope, and a `build_usable: yes | no` line.
+5. **Extend `08-review/cycle-<n>/verification.md`** under `## Runtime verification`: every command
+   and its real output, the smoke test result, and the claim check. If stage 1 ran — including as
+   the implementation join — leave its `build_usable` line and its diff scope exactly as written.
+   The four static lenses are reading both while you work, and rewriting the file under them is how
+   a lens ends up reviewing a scope nobody agreed on. Only write those two yourself when you ran
+   both stages in one call.
 
 **If the build or suite is broken, stop.** Do not fan out — five reviewers reviewing code that
 does not compile produce five reports about the same thing. Open the issue, fail the gate, and

@@ -10,7 +10,7 @@ assigned to you. You are given a contract; honor it.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly — it is the binding contract for where artifacts live, how agents communicate, and how state and history are recorded.
 
-The protocol core is split; **read `test-plan.md`, `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it — plus `parallel-safety.md` when your launch says you are one of a parallel group, since sections 9 and 9b then bind what you may edit and what you may run — and nothing else from `sections/` unless the core points you at one — protocol section 0.**
+The protocol core is split; **read `test-plan.md`, `design-authority.md` from `${CLAUDE_PLUGIN_ROOT}/skills/sdlc-protocol/sections/` in one batch alongside it — plus `parallel-safety.md` unless your launch says you are running alone, since sections 9 and 9b then bind what you may edit and what you may run — and nothing else from `sections/` unless the core points you at one — protocol section 0.**
 
 ## Inputs
 Your task id (or issue ids), `05-architecture/interfaces.md`, `05-architecture/architecture.md`,
@@ -77,25 +77,36 @@ also `03b-figma/` if it exists — see step 2b.
    invariants, tricky branches, anything you had to think hard about. The plan is a floor, not a
    ceiling.
 
-5. **Verify before reporting, scoped to whether you are alone in the phase.** Your launch tells
-   you whether you are running alone or as one of a parallel group. If it does not say, ask —
-   do not assume you are alone.
+5. **Verify before reporting, scoped to the tree you share.** Your launch tells you whether you
+   are alone or one of a parallel group. **If it does not say, assume the group**: the scoped run
+   is the safe reading in both cases, and the wide one is not.
 
    - **Alone** — run the project's build, lint, type check, and test suite from
      `.sdlc/project-conventions.md`, verbatim.
-   - **One of a parallel group** — run the type check, the lint, and the tests covering your own
-     files and your assigned `TC` ids. Do **not** run the full suite, start a dev server, or seed
-     fixtures. Your peers are editing the same working tree, so a full run measures something
-     mid-rewrite: a failure it reports may belong to a task that is not yours, and a pass proves
-     less than it looks like it does. It is also the same minutes spent once per member. The
-     integrated build and suite run once at the group's join — protocol section 9 rule 3 and
-     section 9b.
+   - **One of a group sharing your working tree** — run the type check, the lint, and the tests
+     covering your own files and your assigned `TC` ids. Do **not** run the full suite, start a
+     dev server, or seed fixtures. Your peers are editing the same tree, so a wide run measures
+     something mid-rewrite: a failure it reports may belong to a task that is not yours, and a
+     pass proves less than it looks like it does. It is also the same minutes spent once per
+     member — protocol section 9 rule 3 and section 9b.
+   - **One of a group working in separate repositories** (protocol section 12) — you share no
+     tree with them, so verify your own repository in full, exactly as if alone. The join there is
+     integration, not a build.
+
+   **Most type checks are whole-tree, so read yours like one.** Errors in files your task does not
+   own are your peers' work in progress: do not fix them, do not report them as your failure, and
+   do not wait for them to clear. Report the errors in files you changed. Scope the invocation to
+   your own files where the project's tooling supports it, and say which form you ran.
+
+   The integrated build and type check run once when the group joins. The **suite** runs in the
+   review phase's verify-slow, where it has always run — the join is build and type check only, so
+   do not describe a suite run at the join as something you are waiting on.
 
    Either way: if a command does not exist, say so, and never claim verification you did not
    perform. Report failures with their actual output. In `## Verification run`, give the exact
-   commands and their real results, and name what you left to the join. A scoped pass reported as
-   a scoped pass is an honest result; a scoped pass reported as a green suite is a `blocker` the
-   review lead opens against you.
+   commands and their real results, and name what you left to the join and to verify-slow. A scoped
+   pass reported as a scoped pass is an honest result; a scoped pass reported as a green suite is a
+   `blocker` the review lead opens against you.
 
 6. **Write `07-implementation/TASK-<NNN>.md`**:
 
@@ -111,7 +122,7 @@ status: complete        # complete | partial | blocked
 ## Contract adherence   (any deviation, with the bus message that authorized it)
 ## Design source        (`03b-figma/v<N>` published, or markdown spec only — and any gap you hit)
 ## Tests added          (what each proves, mapped to AC ids)
-## Verification run     (exact commands, exact results — and what you left to the join)
+## Verification run     (exact commands and results — what you left to the join and verify-slow)
 ## Deviations and trade-offs
 ## What I did NOT do    (and why — deferred, out of scope, blocked)
 ## Notes for review and QA
@@ -128,7 +139,10 @@ When assigned issues instead of a task:
   and how you satisfied the issue's verification steps.
 - Re-run the verification steps written in the issue before marking it fixed. Fix mode groups are
   parallel too — step 5's scoping applies, so run the issue's steps and the tests around your own
-  files, not the suite.
+  files, not the suite. If an issue's steps need a running app or seeded fixtures, say so in the
+  issue and leave them to the caller's join rather than starting one inside the group; a fix-mode
+  group gets the same verify-fast join a phase 7 group does, and the suite behind it, before any
+  gate is signed.
 - Never close an issue you disagree with — respond in the issue body and leave it `open`
   for the opener to resolve.
 

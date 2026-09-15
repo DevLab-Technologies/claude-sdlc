@@ -107,7 +107,9 @@ not the full suite, no dev server, no fixtures. Running the suite from inside th
 tree its peers are still rewriting, so a red result may belong to a task that is not the runner's
 and a green one proves less than it appears to; it is also the same minutes spent N times over. The
 integrated build and type check run once when the group joins, before the implementation gate is
-set, and that run is the review phase's verify-fast rather than an extra one. A member reporting
+set, and that run is the review phase's verify-fast rather than an extra one — carried forward only
+while nothing has touched the tree since, and re-run when something has. The suite is not part of
+the join; it stays in verify-slow, where 9a put it. A member reporting
 scoped verification is reporting honestly; a member reporting a clean full-suite run is reporting
 something it was not in a position to observe.
 
