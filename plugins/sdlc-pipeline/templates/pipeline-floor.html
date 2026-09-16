@@ -1360,12 +1360,19 @@
   // a desk shows the sticky record of what happened to it: resting (finished),
   // issue (finished with an unresolved problem), or idle (never started yet).
   function visualState(desk) {
-    if (desk.activeNow) return desk.state;         // working | done | bad, this instant
+    // Being in the step on screen only describes the desk better than its own
+    // record while that step has it working or flagging something. A step whose
+    // runs all stalled still reads "done" — the gate closed — and taking that as
+    // the desk's state is what had a desk with no run_complete drawing the
+    // finished marker while the roster called it stalled.
+    if (desk.activeNow && desk.state === "working") return "working";
+    if (desk.activeNow && desk.state === "bad") return "bad";
     // An open finding outranks a stalled run: the blocker is live and someone has
     // to act on it, where the unclosed run is a fact about a session that already
     // ended. The roster still lists the desk under "stalled" either way.
     if (desk.hasOpenIssue) return "issue";
     if (desk.stalled) return "stalled";            // started a run nothing ever closed
+    if (desk.activeNow) return desk.state;         // done, this instant
     if (desk.completed) return "resting";
     return "idle";
   }

@@ -528,7 +528,6 @@ function buildState(root, slug) {
 
     const desks = [];
     const real = {};
-    const durationsRecorded = {};
     for (const run of cluster) {
       const desk = deskFor(run, counter);
       if (!desk) continue;
@@ -540,7 +539,6 @@ function buildState(root, slug) {
       const ms = run.running ? null : (run.durationMs ?? 0);
       // A desk hit twice in one step (implementer slot collision) accrues both.
       real[desk] = (real[desk] || 0) + (ms ?? 0);
-      durationsRecorded[desk] = run.durationRecorded;
     }
     if (!desks.length) return;   // whole cluster was off-roster; already reported
 
@@ -610,7 +608,11 @@ function buildState(root, slug) {
     }
 
     const names = cluster.map((r) => shortName(r.agent, deskFor(r, counter))).filter(Boolean);
-    const unrecorded = Object.entries(durationsRecorded).filter(([, v]) => v === false).length;
+    // "duration unrecorded" is about a run_complete that omitted duration_ms —
+    // a logging slip in the agent. A stalled run has no duration for a different
+    // reason, with a different remedy (/sdlc-resume), so it gets its own note.
+    const unrecorded = cluster.filter((r) => r._desk && !r.stalled && r.durationRecorded === false).length;
+    const stalledHere = cluster.filter((r) => r.stalled).length;
     steps.push({
       id: idx,
       desks, real, state, phase: gate, cycle,
@@ -626,6 +628,7 @@ function buildState(root, slug) {
         : (cluster.length > 1
           ? `${cluster.length} agents ran concurrently in ${cluster[0].phase}.`
           : `${names[0]} in ${cluster[0].phase}.`)
+          + (stalledHere ? " (never closed)" : "")
           + (unrecorded ? " (duration unrecorded)" : ""),
     });
   });
