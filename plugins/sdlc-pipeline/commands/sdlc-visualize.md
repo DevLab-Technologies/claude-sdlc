@@ -68,6 +68,9 @@ The desks are the live picture; the panel is the record.
 - **Agents** — every desk on the floor grouped into working, done, queued and not-run, with runs,
   total time and tokens used.
 - **Feed** — the event log as it arrives, at the times the events actually carry.
+- **Gaps** — what the floor cannot show honestly on its own, grouped by kind and marked with what
+  kind of limit each one is. It is the same list you report in step 2, on the page itself, so a
+  reader who never sees your report still knows what the desks are and are not claiming.
 - Clicking a desk opens its record: status, what it is working on, total time across all its runs,
   tokens used, and its recent log lines.
 - The footer carries elapsed wall-clock, summed agent time, total tokens, and the run count. Elapsed
@@ -80,31 +83,37 @@ an estimate when reporting to the human.
 
 ## Step 2 — Read the gaps and report them
 
-The builder prints a `gaps` list (and puts the same list on `state.json`). Run it once with `--json`
-if the server swallowed the output:
+The builder prints the gaps grouped (and puts both shapes on `state.json`: `gaps`, the flat list,
+and `gapGroups`, the same lines filed by kind). The floor's own **gaps** tab shows the same grouping,
+so the page and your report never disagree. Run it once with `--json` if the server swallowed the
+output:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --json
 ```
 
-Every gap is something the visualization cannot show honestly on its own, so it has to live in your
-written report. Expect any of:
+**Report the groups, not the lines.** A real feature produces well over a hundred gap lines, and a
+hundred loose sentences is the same information nobody reads. Lead with the count and the kind —
+"29 completions with no matching start" — and quote individual lines only where one of them matters
+on its own. Each group carries a `nature`, and that is the order to work through them:
 
-- a `phase_start` with no `run_complete` that the log itself closes out — its cycle ended, or its
-  gate reached a verdict without it. The floor calls these **stalled**, not working, and names the
-  reason; they are interrupted runs (protocol 3a) and `/sdlc-resume` is what clears them
-- a `phase_start` with no `run_complete` and nothing after it — shown as working, because from the
-  log alone "running now" and "interrupted a moment ago" are indistinguishable; say which you
-  believe it is
-- an agent id with no desk on the floor, whose runs are therefore not drawn
-- a `run_complete` with no `duration_ms`, where the timestamp gap was used instead
-- completed runs with no recorded token usage, and `run_usage` events that matched no run
-- implementer runs that named no `task`, which the board therefore cannot attribute
-- a task record with no workplan entry behind it
-- a gate skipped by the feature's track — the floor marks its pill "skipped", but the reason it was
-  skipped lives only in your report
-- more than three concurrent implementer tasks sharing desks A/B/C
-- `sdlc-debugger` and fix-mode `sdlc-implementer` time attributed to the most recently failed gate
+- **`unresolved`** — the log contradicts itself, and somebody can go and fix the logging. Completions
+  with no start anywhere, tasks with no usable record, runs that named no task, agent ids that are
+  neither a desk nor a known alias of one, `run_usage` that matched no run. These are the ones worth
+  raising.
+- **`derived`** — the floor inferred something, and the line says exactly how. Open runs the log
+  itself closed out (a cycle ended, a gate reached a verdict without them, the agent was re-run, or
+  `/sdlc-resume` reconciled the workspace afterwards — the floor calls these **stalled**, not
+  working, and `/sdlc-resume` is what clears them); a run whose two halves were bracketed under
+  different phase labels and paired on its own `duration_ms`; an agent id mapped onto its desk; a
+  duration derived from the timestamp gap.
+- **`irreducible`** — no log could ever settle it, so it is a standing caveat rather than a defect.
+  A `phase_start` with nothing after it at all is shown as working, because from the log alone
+  "running now" and "interrupted a moment ago" are indistinguishable — say which you believe it is.
+  Also: runs with no recorded token usage; more than three concurrent implementer tasks sharing
+  desks A/B/C; `sdlc-debugger` and fix-mode `sdlc-implementer` time attributed to the most recently
+  failed gate; pipeline machinery (`sdlc-orchestrator`, `sdlc-resume`) having no desk by design; a
+  gate skipped by the feature's track, whose reason lives only in your report.
 
 ## Step 3 — Say what it is
 
@@ -115,7 +124,7 @@ In your reply, state:
   and `cycle`, which are the same numbers `/sdlc-timing` reports, so the two never disagree
 - Whether anything is running right now, what it is working on, and how long it has been at it
 - What runs next
-- Everything from `gaps`
+- Everything from `gapGroups` — by group and count, in nature order, as step 2 describes
 
 ## Changing the visualization
 
@@ -124,6 +133,12 @@ In your reply, state:
 - A new agent needs a desk in `DEPARTMENTS` and `ROLE_TINT` in the HTML **and** an entry in
   `DESK_IDS`, `AGENT_GATE` and `GATE_AGENTS` in the builder. Missing any part is reported as a gap
   rather than silently dropped, so check the gaps after adding one.
+- A **renamed** agent does not need a new desk — add the old id to `AGENT_ALIASES` in the builder and
+  its historical runs keep appearing on the desk that succeeded it. An id that runs the pipeline
+  rather than a phase of it belongs in `MACHINERY_AGENTS`, which reports it as a deliberate omission
+  instead of as an agent nobody gave a desk.
+- A new gap kind needs an entry in `GAP_KINDS` — a title and one of the three natures. `gaps.add()`
+  without one falls back to "other", which is honest but says nothing useful in a report.
 - A new phase needs an entry in `GATES` in both files, and in `PHASE_GATE` and `GATE_AGENTS` in the
   builder.
 - Roster changes are additive. Do not rewrite the layout or the rendering logic.
