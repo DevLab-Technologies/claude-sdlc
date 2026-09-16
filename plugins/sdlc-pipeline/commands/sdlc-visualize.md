@@ -90,8 +90,12 @@ node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --json
 Every gap is something the visualization cannot show honestly on its own, so it has to live in your
 written report. Expect any of:
 
-- a `phase_start` with no `run_complete` — the desk shows as still working, and from the log alone
-  "running now" and "interrupted" are indistinguishable; say which you believe it is
+- a `phase_start` with no `run_complete` that the log itself closes out — its cycle ended, or its
+  gate reached a verdict without it. The floor calls these **stalled**, not working, and names the
+  reason; they are interrupted runs (protocol 3a) and `/sdlc-resume` is what clears them
+- a `phase_start` with no `run_complete` and nothing after it — shown as working, because from the
+  log alone "running now" and "interrupted a moment ago" are indistinguishable; say which you
+  believe it is
 - an agent id with no desk on the floor, whose runs are therefore not drawn
 - a `run_complete` with no `duration_ms`, where the timestamp gap was used instead
 - completed runs with no recorded token usage, and `run_usage` events that matched no run

@@ -640,7 +640,21 @@
     margin-bottom: 6px;
   }
 
-  .modal-log .entry { color: var(--ink-dim); }
+  /* A run_complete can carry a paragraph of verification detail. Clamped, the
+     log stays scannable and a click opens the entry in full — the same bargain
+     the feed rows make on a narrow screen. */
+  .modal-log .entry {
+    color: var(--ink-dim);
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+    margin-bottom: 6px;
+  }
+
+  .modal-log .entry.open { -webkit-line-clamp: unset; }
+
   .modal-log .entry.bad { color: var(--bad); }
   .modal-log .entry .b::before { content: "▸ "; color: var(--ink-faint); }
   .modal-log .entry.done .b::before { content: "✓ "; color: var(--ok); }
@@ -1097,6 +1111,7 @@
     Object.keys(DESKS).forEach(function (id) {
       var d = DESKS[id];
       d.state = "idle"; d.activeNow = false; d.completed = false; d.hasOpenIssue = false;
+      d.stalled = false;
       d.log = []; d.totalRealMs = 0; d.liveSince = null; d.lastGate = null;
     });
     phaseTotals = {};
@@ -1345,15 +1360,26 @@
   // a desk shows the sticky record of what happened to it: resting (finished),
   // issue (finished with an unresolved problem), or idle (never started yet).
   function visualState(desk) {
-    if (desk.activeNow) return desk.state;         // working | done | bad, this instant
+    // Being in the step on screen only describes the desk better than its own
+    // record while that step has it working or flagging something. A step whose
+    // runs all stalled still reads "done" — the gate closed — and taking that as
+    // the desk's state is what had a desk with no run_complete drawing the
+    // finished marker while the roster called it stalled.
+    if (desk.activeNow && desk.state === "working") return "working";
+    if (desk.activeNow && desk.state === "bad") return "bad";
+    // An open finding outranks a stalled run: the blocker is live and someone has
+    // to act on it, where the unclosed run is a fact about a session that already
+    // ended. The roster still lists the desk under "stalled" either way.
     if (desk.hasOpenIssue) return "issue";
+    if (desk.stalled) return "stalled";            // started a run nothing ever closed
+    if (desk.activeNow) return desk.state;         // done, this instant
     if (desk.completed) return "resting";
     return "idle";
   }
 
   var GLOW = { idle: "#3a4658", resting: "#2c6b52", issue: "#6b2f36",
-    working: "#ffb545", done: "#5fd3a0", bad: "#ff6b6b" };
-  var PERSON_TINT = { idle: "#48597a", resting: "#3fa87d", issue: "#c1595f" };
+    working: "#ffb545", done: "#5fd3a0", bad: "#ff6b6b", stalled: "#4a3a2a" };
+  var PERSON_TINT = { idle: "#48597a", resting: "#3fa87d", issue: "#c1595f", stalled: "#8a6127" };
   var HEAD_IDLE = "#3a4658", HEAD_LIT = "#e6b98c";
   var OUTLINE = "rgba(9,13,20,0.6)";
 
@@ -1416,6 +1442,11 @@
     } else if (vis === "resting" || (desk.activeNow && desk.state === "done")) {
       ctx.fillStyle = "#5fd3a0";
       ctx.fillRect(x + 16, bodyY - 12, 8, 4);
+    } else if (vis === "stalled") {
+      // An empty chair with the monitor still on: the run was never closed.
+      ctx.fillStyle = "#8a6127";
+      ctx.font = "12px 'Silkscreen', monospace";
+      ctx.fillText("?", x + 18, bodyY - 5);
     } else if (vis === "issue" || (desk.activeNow && desk.state === "bad")) {
       ctx.fillStyle = "#ff6b6b";
       ctx.font = "14px 'Silkscreen', monospace";
@@ -1514,6 +1545,7 @@
     done:    { cls: "st-resting", text: "just finished" },
     bad:     { cls: "st-issue",   text: "flagged an issue" },
     resting: { cls: "st-resting", text: "done — resting" },
+    stalled: { cls: "st-issue",   text: "stalled" },
     issue:   { cls: "st-issue",   text: "unresolved issue" },
     idle:    { cls: "st-idle",    text: "not started yet" }
   };
@@ -1529,10 +1561,19 @@
     modalStatus.className = "modal-status " + status.cls;
     modalStatus.textContent = status.text;
     var rosterRow = rosterByDesk[id] || null;
+    // activeNow means "in the step the floor is currently showing", which is not
+    // the same as working: the last step applied is usually a finished one. Only
+    // a desk whose own state is "working" is working.
     modalNow.textContent = d.activeNow
-      ? ((rosterRow && rosterRow.task ? rosterRow.task + " — " : "") + "working now")
+      ? (d.state === "working"
+          ? ((rosterRow && rosterRow.task ? rosterRow.task + " — " : "") + "working now")
+          : d.state === "bad"
+            ? "just finished this run, and left an open finding."
+            : "just finished this run.")
       : (vis === "resting" ? "finished its part — waiting for the rest of the cycle."
         : vis === "issue" ? "left an open finding — waiting on a fix."
+        : rosterRow && rosterRow.status === "stalled"
+          ? "started a run that was never closed — " + (rosterRow.stalledWhy || "no run_complete was ever recorded") + "."
         : rosterRow && rosterRow.status === "queued"
           ? "hasn't run yet — its gate is still ahead."
           : "its gate has already passed or been skipped; it is not going to run.");
@@ -1543,14 +1584,17 @@
     modalTime.textContent = worked > 0
       ? fmtDuration(worked) + (r && r.liveSince && !snapshotMode ? " and counting" : "") +
         (r && r.runs > 1 ? " across " + r.runs + " runs" : "")
-      : "not started yet";
+      // A stalled desk demonstrably started; what it has no figure for is how
+      // long it worked, since nothing ever closed the run.
+      : (r && r.status === "stalled" ? "unknown — the run was never closed" : "not started yet");
     modalTask.textContent = (r && r.task) ? r.task
       : (r && r.phase) ? r.phase
       : (r && r.status === "queued") ? "queued — " + (r.gate || "no gate") + " has not run yet"
       : "—";
     modalTokens.textContent = r
-      ? fmtTokens(r.tokens) + (typeof r.tokens === "number" ? "" : "") +
-        (r && r.tokensMissing ? " · " + r.tokensMissing + " run(s) reported none" : "")
+      ? fmtTokens(r.tokens) +
+        (typeof r.tokens === "number" && r.tokensMissing
+          ? " · " + r.tokensMissing + " run(s) reported none" : "")
       : "not reported";
 
     modalLog.innerHTML = "";
@@ -1564,6 +1608,7 @@
         var row = document.createElement("div");
         row.className = "entry" + (entry.kind === "bad" ? " bad" : entry.kind === "done" ? " done" : "");
         row.innerHTML = '<span class="b"></span>' + entry.text;
+        row.title = "click to expand";
         modalLog.appendChild(row);
       });
     }
@@ -1600,6 +1645,12 @@
   // clamp does not apply.
   tickerEl.addEventListener("click", function (evt) {
     var row = evt.target.closest ? evt.target.closest(".ticker-row") : null;
+    if (row) row.classList.toggle("open");
+  });
+
+  // Bound on the container so it covers entries rendered later.
+  modalLog.addEventListener("click", function (evt) {
+    var row = evt.target.closest ? evt.target.closest(".entry") : null;
     if (row) row.classList.toggle("open");
   });
 
@@ -1658,6 +1709,7 @@
     var appendOnly = SCRIPT.length > 0 && st.steps.length >= SCRIPT.length && !changedInPlace(st.steps);
     SCRIPT = st.steps;
     if (!appendOnly) resetAll();
+    applyRosterFlags();
     cycleNumEl.textContent = String(st.cycle || 1);
     // Issue counts are the log's current tally, not something accumulated step
     // by step — an issue opened in cycle 1 and verified in cycle 3 has to read as
@@ -1693,13 +1745,16 @@
   function renderNow(st) {
     var live = (st && st.nowRunning) || [];
     nowListEl.innerHTML = "";
+    var stalled = (st && st.stalled) || 0;
+    var stalledNote = stalled ? " · " + stalled + " stalled" : "";
     if (!live.length) {
-      currentLineEl.textContent = st && st.shipped ? "shipped — no agent running"
-        : (st && !st.empty ? "no agent running at the last event" : "nothing has run yet");
+      currentLineEl.textContent = (st && st.shipped ? "shipped — no agent running"
+        : (st && !st.empty ? "no agent running at the last event" : "nothing has run yet"))
+        + stalledNote;
       return;
     }
-    currentLineEl.textContent = live.length === 1
-      ? "1 agent working" : live.length + " agents working concurrently";
+    currentLineEl.textContent = (live.length === 1
+      ? "1 agent working" : live.length + " agents working concurrently") + stalledNote;
     live.forEach(function (r) {
       var row = el("div", "now-row");
       row.appendChild(el("span", "who", shortDesk(r.desk || r.agent)));
@@ -1784,9 +1839,10 @@
     var next = (st && st.upNext && st.upNext[0]) || null;
     if (next) next.agents.forEach(function (d) { upNextDesks[d] = true; });
 
-    var ORDER = { working: 0, done: 1, queued: 2, idle: 3 };
-    var LABEL = { working: "working", done: "done", queued: "queued", idle: "not run" };
-    var groups = ["working", "done", "queued", "idle"];
+    var ORDER = { working: 0, stalled: 1, done: 2, queued: 3, idle: 4 };
+    var LABEL = { working: "working", stalled: "stalled — started, never closed",
+      done: "done", queued: "queued", idle: "not run" };
+    var groups = ["working", "stalled", "done", "queued", "idle"];
     var any = false;
     groups.forEach(function (g) {
       var rows = roster.filter(function (r) { return r.status === g; })
@@ -1799,19 +1855,36 @@
         var row = el("div", "row");
         row.appendChild(el("span", "name", shortDesk(r.desk)));
         var cls = r.status === "working" ? "working" : r.status === "done" ? "done"
-          : r.status === "queued" ? "queued" : "";
+          : r.status === "stalled" ? "bad" : r.status === "queued" ? "queued" : "";
         row.appendChild(el("span", "chip " + cls, r.gate || "—"));
         var bits = [];
         if (r.runs) bits.push(r.runs + (r.runs === 1 ? " run" : " runs"));
         if (r.totalMs) bits.push(fmtDuration(r.totalMs) + (r.liveSince && !snapshotMode ? " and counting" : ""));
         bits.push(fmtTokens(r.tokens) + (typeof r.tokens === "number" ? " tokens" : ""));
-        if (r.tokensMissing) bits.push(r.tokensMissing + " run(s) unreported");
+        // Only worth saying when some runs did report: "not reported" already
+        // covers a desk where none of them did.
+        if (typeof r.tokens === "number" && r.tokensMissing) {
+          bits.push(r.tokensMissing + " run(s) unreported");
+        }
         if (r.task) bits.push(r.task);
+        // Why the floor calls it stalled rather than working — the log's own
+        // reason, not a guess about the agent.
+        if (r.stalledWhy) bits.push(r.stalledWhy);
         row.appendChild(el("span", "meta", bits.join(" · ")));
         agentRowsEl.appendChild(row);
       });
     });
     if (!any) agentRowsEl.appendChild(el("div", "empty-note", "no desks have run yet."));
+  }
+
+  // A desk whose run was never closed must not read as finished. The step that
+  // carried it is not live, so without this the desk would settle into the
+  // resting look and claim work that was never accounted for.
+  function applyRosterFlags() {
+    Object.keys(DESKS).forEach(function (id) {
+      var r = rosterByDesk[id];
+      DESKS[id].stalled = !!(r && r.status === "stalled");
+    });
   }
 
   function renderFooter(st) {
