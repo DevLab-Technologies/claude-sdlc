@@ -1361,8 +1361,11 @@
   // issue (finished with an unresolved problem), or idle (never started yet).
   function visualState(desk) {
     if (desk.activeNow) return desk.state;         // working | done | bad, this instant
-    if (desk.stalled) return "stalled";            // started a run nothing ever closed
+    // An open finding outranks a stalled run: the blocker is live and someone has
+    // to act on it, where the unclosed run is a fact about a session that already
+    // ended. The roster still lists the desk under "stalled" either way.
     if (desk.hasOpenIssue) return "issue";
+    if (desk.stalled) return "stalled";            // started a run nothing ever closed
     if (desk.completed) return "resting";
     return "idle";
   }

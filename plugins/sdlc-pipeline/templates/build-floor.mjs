@@ -316,7 +316,17 @@ function classifyOpenRuns(runs, events, currentCycle, gaps) {
       const g = gateEvents.find((e) => e.phase === r.phase && (e.cycle ?? 1) === cycle && e._t > r.start);
       if (g) why = `the ${r.phase} gate was recorded ${g.event === "gate_failed" ? "failed" : "passed"} while it was still open`;
     }
-    if (why) { r.stalled = true; r.stalledWhy = why; stalled.push(r); }
+    if (why) {
+      r.stalled = true;
+      r.stalledWhy = why;
+      // Give it no span at all. We know it stopped; we do not know when, and an
+      // open-ended run stretches to now — which pulled every later run in the
+      // same phase and cycle into one step that never ends, reporting runs hours
+      // apart as concurrent. `running` stays true, so no duration is counted and
+      // no run_complete is invented.
+      r.end = r.start;
+      stalled.push(r);
+    }
     else live++;
   }
   for (const r of stalled) {
@@ -390,7 +400,10 @@ function loadSignoffs(runsDir) {
     const caveat = line
       .replace(/^[-*]\s*/, "")
       .replace(/^\**\s*NOT\s+verified\**\s*[:\u2014-]?\s*/i, "");
-    byAgent.get(agent).push({ ts: Date.parse(m[1].replace(/-/g, ":").replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3")) || 0, text: caveat || line.replace(/^[-*]\s*/, "") });
+    // A line that was nothing but the label leaves nothing to say after it.
+    // Falling back to the original text would print the label twice — the very
+    // thing the strip above exists to prevent.
+    byAgent.get(agent).push({ ts: Date.parse(m[1].replace(/-/g, ":").replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3")) || 0, text: caveat || "no detail given" });
   }
   for (const list of byAgent.values()) list.sort((a, b) => a.ts - b.ts);
   return byAgent;
