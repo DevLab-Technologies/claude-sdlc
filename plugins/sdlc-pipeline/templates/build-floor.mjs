@@ -142,6 +142,13 @@ const AGENT_ALIASES = {
 // floor by design, which is a different statement from "this agent is unknown".
 const MACHINERY_AGENTS = new Set(["sdlc-orchestrator", "sdlc-resume"]);
 
+// A run the floor actually draws. Machinery has no desk by design, and the
+// omission has to hold everywhere the floor speaks for itself: an orchestrator
+// bracket with no run_complete — it keeps none — would otherwise leave the
+// header reading "1 agent working" for the life of the feature, pointing at a
+// desk nobody can see and no stall rule can ever close.
+function isDrawn(run) { return !MACHINERY_AGENTS.has(run.agent); }
+
 // The subset that RECONCILES the workspace. Machinery is not the same claim:
 // the orchestrator launching the next phase settles nothing, and treating its
 // bracket as a recovery marked every live desk stalled behind it.
@@ -179,6 +186,7 @@ function normaliseAgent(raw) {
 //   irreducible  no log could ever answer this — it is a permanent caveat
 const GAP_KINDS = {
   "log-unreadable":    { nature: "unresolved",  title: "event log lines that could not be read" },
+  "log-empty":         { nature: "irreducible", title: "the log is empty" },
   "open-run-live":     { nature: "irreducible", title: "open runs shown as working" },
   "open-run-settled":  { nature: "derived",     title: "open runs the log itself closed out" },
   "orphan-complete":   { nature: "unresolved",  title: "completions with no matching start" },
@@ -196,6 +204,7 @@ const GAP_KINDS = {
   "task-no-workplan":  { nature: "derived",     title: "tasks shown from the record alone" },
   "task-unrecorded":   { nature: "unresolved",  title: "tasks with no usable record behind them" },
   "task-unattributed": { nature: "unresolved",  title: "runs that named no task" },
+  "task-unplaceable":  { nature: "unresolved",  title: "runs naming a task the board has no row for" },
   "state-unreadable":  { nature: "unresolved",  title: "state.json could not be read" },
   "other":             { nature: "unresolved",  title: "other" },
 };
@@ -657,7 +666,7 @@ function buildState(root, slug) {
     // Through `gaps`, not around it: anything readEvents already filed — an
     // unreadable line, a bad timestamp — is why the log looks empty, and the
     // CLI prints from the groups.
-    gaps.add("log-unreadable", `no events in ${logPath} — nothing has run yet.`);
+    gaps.add("log-empty", `no events in ${logPath} — nothing has run yet.`);
     return { slug, empty: true, generatedAt: now,
       gaps: gaps.lines(),
       gapGroups: gaps.groups(),
@@ -913,7 +922,7 @@ function buildState(root, slug) {
   // Stalled runs are not running, whatever their missing run_complete implies.
   // Counting them here is what kept a header reading "pipeline running" on a
   // feature whose last real activity was days earlier.
-  const anyRunning = runs.some((r) => r.running && !r.stalled);
+  const anyRunning = runs.some((r) => isDrawn(r) && r.running && !r.stalled);
   if (cycles > 2) {
     gaps.add("cycle-rail", `this feature reached cycle ${cycles}; the floor's cycle badge shows the real number, but the gate rail only reflects the latest cycle's outcomes.`);
   }
@@ -1265,11 +1274,15 @@ function loadTasks(featureDir, gaps) {
 function attachTaskRuns(tasks, runs, gaps) {
   const byId = new Map(tasks.map((t) => [t.id, t]));
   let unattributed = 0;
+  const unplaceable = new Set();
   for (const r of runs) {
     if (r.agent !== "sdlc-implementer") continue;
     if (!r.task) { unattributed++; continue; }
     const t = byId.get(r.task);
-    if (!t) continue;
+    // The run names its work and the board still cannot place it: no workplan
+    // entry and no task record. Dropping that silently is the one thing this
+    // floor must not do — the desks show the time with nothing to attach it to.
+    if (!t) { unplaceable.add(r.task); continue; }
     t.desk = r._desk || t.desk;
     t.startedAt = t.startedAt == null ? r.start : Math.min(t.startedAt, r.start);
     if (r.running) { t.running = true; t.status = "running"; }
@@ -1281,6 +1294,9 @@ function attachTaskRuns(tasks, runs, gaps) {
   }
   if (unattributed) {
     gaps.add("task-unattributed", `${unattributed} implementer run(s) named no task — the board cannot say which workplan task they built, so they appear only on the desks.`);
+  }
+  if (unplaceable.size) {
+    gaps.add("task-unplaceable", `${Array.from(unplaceable).sort().join(", ")} — named by an implementer run but absent from both 05-architecture/workplan.md and 07-implementation/, so the board has no row to put that run on and it appears only on the desks.`);
   }
   // A task whose run started and finished, with no 07-implementation/TASK-<NNN>.md
   // behind it, has an outcome nobody recorded. Leaving it "pending" states the
@@ -1386,7 +1402,7 @@ function buildPlan(gateStatus, runs, skipped, now) {
 // unpaired phase_starts, which is also why the floor cannot tell "running" from
 // "interrupted" — both look exactly like this in the log.
 function buildNow(runs, now) {
-  return runs.filter((r) => r.running && !r.stalled).map((r) => ({
+  return runs.filter((r) => isDrawn(r) && r.running && !r.stalled).map((r) => ({
     agent: r.agent, desk: r._desk || null, phase: r.phase, cycle: r.cycle,
     gate: AGENT_GATE[r.agent] || PHASE_GATE[r.phase] || null,
     task: r.task, model: r.model,
