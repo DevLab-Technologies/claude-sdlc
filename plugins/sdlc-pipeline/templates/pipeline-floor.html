@@ -389,6 +389,13 @@
     border-bottom: 2px solid transparent;
     padding: 9px 4px;
     cursor: pointer;
+    /* The gaps tab carries a count, and a phone gives four tabs about 80px
+       each. Truncate the label rather than let it wrap and shove the row two
+       lines tall. */
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tab:hover { color: var(--ink-dim); }
@@ -468,6 +475,25 @@
   .now-row .task { color: var(--ink-dim); }
 
   .empty-note { color: var(--ink-faint); font-style: italic; padding: 12px 14px; font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* The gaps pane is the floor's own disclosure — everything the derivation had
+     to infer, everything the log contradicts itself about, and the caveats no
+     log could ever settle. Grouped by kind, because a hundred loose sentences
+     is a wall rather than a disclosure, and coloured by nature so a logging
+     defect somebody can fix is never mistaken for a permanent limit. */
+  .chip.unresolved  { color: var(--bad); border-color: var(--bad); background: transparent; }
+  .chip.derived     { color: var(--signal); border-color: var(--signal-dim); background: transparent; }
+  .chip.irreducible { color: var(--ink-faint); border-color: var(--panel-line); background: transparent; }
+
+  .gap-line {
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    line-height: 1.45;
+    padding: 3px 0 3px 9px;
+    margin: 2px 0 0;
+    border-left: 1px solid var(--panel-line);
+    overflow-wrap: anywhere;
+  }
 
   /* ---------- controls ---------- */
 
@@ -829,6 +855,7 @@
         <button class="tab" id="tabBoard" role="tab" aria-selected="true" aria-controls="paneBoard">board</button>
         <button class="tab" id="tabAgents" role="tab" aria-selected="false" aria-controls="paneAgents">agents</button>
         <button class="tab" id="tabFeed" role="tab" aria-selected="false" aria-controls="paneFeed">feed</button>
+        <button class="tab" id="tabGaps" role="tab" aria-selected="false" aria-controls="paneGaps">gaps</button>
       </div>
 
       <!-- What the work is and what is left of it: the workplan tasks, then the
@@ -844,6 +871,14 @@
 
       <div class="tab-body" id="paneFeed" role="tabpanel" aria-labelledby="tabFeed" hidden>
         <div class="ticker" id="ticker"></div>
+      </div>
+
+      <!-- What this floor cannot show honestly on its own. The builder files
+           every gap under a kind and a nature; this pane prints them grouped, so
+           the count leads and the detail is underneath rather than the other way
+           round. -->
+      <div class="tab-body" id="paneGaps" role="tabpanel" aria-labelledby="tabGaps" hidden>
+        <div class="rows" id="gapRows"></div>
       </div>
     </div>
   </aside>
@@ -1051,6 +1086,8 @@
   var nowListEl = document.getElementById("nowList");
   var boardRowsEl = document.getElementById("boardRows");
   var agentRowsEl = document.getElementById("agentRows");
+  var gapRowsEl = document.getElementById("gapRows");
+  var tabGapsEl = document.getElementById("tabGaps");
   var outElapsed = document.getElementById("outElapsed");
   var outAgentTime = document.getElementById("outAgentTime");
   var outTokens = document.getElementById("outTokens");
@@ -1487,7 +1524,8 @@
   var TABS = [
     { btn: "tabBoard", pane: "paneBoard" },
     { btn: "tabAgents", pane: "paneAgents" },
-    { btn: "tabFeed", pane: "paneFeed" }
+    { btn: "tabFeed", pane: "paneFeed" },
+    { btn: "tabGaps", pane: "paneGaps" }
   ];
 
   TABS.forEach(function (t) {
@@ -1694,6 +1732,7 @@
     renderNow(st);
     renderBoard(st);
     renderAgents(st);
+    renderGaps(st);
     renderFooter(st);
     if (st.empty) {
       floorCaptionEl.innerHTML = "no events in this feature&rsquo;s log yet &mdash; nothing has run.";
@@ -1826,6 +1865,54 @@
     if (!tasks.length && !plan.length) {
       boardRowsEl.appendChild(el("div", "empty-note", "no workplan or gate record yet."));
     }
+  }
+
+  // What the floor cannot show honestly on its own, by kind.
+  //
+  // The builder files each gap under a nature: `unresolved` is the log
+  // contradicting itself and somebody can go and fix the logging; `derived` is
+  // an inference the floor made and the line says exactly how; `irreducible` is
+  // a caveat no log could ever settle. Ordering by that, defects first, is the
+  // difference between a disclosure and an alibi.
+  function renderGaps(st) {
+    gapRowsEl.innerHTML = "";
+    if (!st || st.empty) {
+      tabGapsEl.textContent = "gaps";
+      gapRowsEl.appendChild(el("div", "empty-note", "nothing has run yet, so there is nothing to disclose."));
+      return;
+    }
+    var groups = st.gapGroups || [];
+    // An older state.json carries only the flat list. Show it rather than an
+    // empty pane that would read as "nothing to disclose".
+    if (!groups.length && st.gaps && st.gaps.length) {
+      groups = [{ title: "not shown on this floor", nature: "unresolved", count: st.gaps.length, lines: st.gaps }];
+    }
+    var total = groups.reduce(function (a, g) { return a + g.count; }, 0);
+    tabGapsEl.textContent = total ? "gaps · " + total : "gaps";
+
+    if (!total) {
+      gapRowsEl.appendChild(el("div", "empty-note",
+        "nothing the floor had to infer, and nothing in the log it could not read."));
+      return;
+    }
+
+    gapRowsEl.appendChild(el("div", "group-label",
+      total + (total === 1 ? " thing" : " things") + " this floor cannot show on its own"));
+
+    groups.forEach(function (g) {
+      var row = el("div", "row");
+      // A group of one is its own statement; the "1 ·" prefix only ever added
+      // a number that disagreed with the sentence beneath it — several of these
+      // lines are themselves a tally ("7 completed runs carry no token usage").
+      row.appendChild(el("span", "name", (g.count > 1 ? g.count + " · " : "") + g.title));
+      row.appendChild(el("span", "chip " + g.nature, g.nature));
+      var wrap = el("span", "meta");
+      (g.lines || []).forEach(function (line) {
+        wrap.appendChild(el("div", "gap-line", line));
+      });
+      row.appendChild(wrap);
+      gapRowsEl.appendChild(row);
+    });
   }
 
   // Every desk on the floor: what it did, how long it took, what it cost, and

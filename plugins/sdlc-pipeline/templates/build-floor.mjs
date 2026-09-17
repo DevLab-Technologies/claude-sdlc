@@ -109,6 +109,138 @@ const ON_DEMAND_DESKS = new Set(["sdlc-debugger"]);
 const FLOATING_AGENTS = new Set(["sdlc-debugger", "sdlc-implementer"]);
 
 /* ============================================================
+   AGENT IDS — what the log wrote, mapped to what the floor has
+   ============================================================ */
+
+// An id in the log is not always a roster id, and every mismatch used to cost a
+// whole desk: the runs were dropped from the floor, their time vanished from it
+// while still counting in /sdlc-timing, and the only trace was a gap line. Three
+// shapes recur, and the first two are mechanical:
+//
+//   sdlc-implementer-TASK-020   a per-task instance id — the work is IN the id
+//   sdlc-debugger-INV-002       the same shape, per investigation
+//   sdlc-review-correctness     an earlier name for a desk that still exists
+//   sdlc-orchestrator           pipeline machinery that never had a desk
+//
+// Instance ids and old names are normalised to the roster id at read time, so
+// pairing, tokens, the task board and the desks all see one id per agent.
+// Machinery is not a defect in the log and never will be, so it is reported as a
+// deliberate omission rather than as an unknown agent nobody can act on.
+const AGENT_ALIASES = {
+  "sdlc-research-internal": "sdlc-researcher-findings",
+  "sdlc-research-findings": "sdlc-researcher-findings",
+  "sdlc-research-external": "sdlc-researcher-prior-art",
+  "sdlc-research-prior-art": "sdlc-researcher-prior-art",
+  "sdlc-research-constraints": "sdlc-researcher-constraints",
+  "sdlc-review-correctness": "sdlc-code-reviewer",
+  "sdlc-reviewer-correctness": "sdlc-code-reviewer",
+  "sdlc-ux-audit": "sdlc-ux-auditor",
+  "sdlc-qa-func": "sdlc-qa-functional",
+};
+
+// Machinery: it runs the pipeline rather than a phase of it. Omitted from the
+// floor by design, which is a different statement from "this agent is unknown".
+const MACHINERY_AGENTS = new Set(["sdlc-orchestrator", "sdlc-resume"]);
+
+// A run the floor actually draws. Machinery has no desk by design, and the
+// omission has to hold everywhere the floor speaks for itself: an orchestrator
+// bracket with no run_complete — it keeps none — would otherwise leave the
+// header reading "1 agent working" for the life of the feature, pointing at a
+// desk nobody can see and no stall rule can ever close.
+function isDrawn(run) { return !MACHINERY_AGENTS.has(run.agent); }
+
+// The subset that RECONCILES the workspace. Machinery is not the same claim:
+// the orchestrator launching the next phase settles nothing, and treating its
+// bracket as a recovery marked every live desk stalled behind it.
+const RECOVERY_AGENTS = new Set(["sdlc-resume"]);
+
+// -> { agent, task, alias }. `task` is set only when the id carried one, and
+// `alias` only when the id was rewritten — both so the gap can say so.
+function normaliseAgent(raw) {
+  const id = String(raw || "").trim();
+  if (!id) return { agent: id, task: null, alias: null };
+  // The `-a`/`-b`/`-c` desk suffixes are not instance ids, so the prefix is
+  // required rather than matching any trailing token. Protocol section 3 names
+  // both shapes together — an implementer given TASK-003, a debugger given
+  // INV-002 — so both desks are matched here or the debugger's runs are dropped.
+  const m = id.match(/^(sdlc-implementer|sdlc-debugger)-((?:TASK|ISSUE|INV)-[A-Za-z0-9.]+)$/i);
+  if (m) return { agent: m[1].toLowerCase(), task: m[2].toUpperCase(), alias: id };
+  if (AGENT_ALIASES[id]) return { agent: AGENT_ALIASES[id], task: null, alias: id };
+  return { agent: id, task: null, alias: null };
+}
+
+/* ============================================================
+   GAPS — what the floor cannot show, recorded in kinds
+   ============================================================ */
+
+// A real feature produces a lot of these: one per unpaired run, per orphan
+// completion, per unattributed task. A flat list of 142 sentences is not a
+// disclosure anybody reads — it is a wall that hides the two lines in it that
+// matter. Every gap is therefore filed under a kind and a nature, so the same
+// facts can be reported as "29 completions with no matching start" with the
+// detail underneath, and so the standing caveats are told apart from the
+// logging defects somebody could go and fix.
+//
+//   derived      the floor inferred something, and the line says exactly how
+//   unresolved   the log contradicts itself; the remedy is to fix the logging
+//   irreducible  no log could ever answer this — it is a permanent caveat
+const GAP_KINDS = {
+  "log-unreadable":    { nature: "unresolved",  title: "event log lines that could not be read" },
+  "log-empty":         { nature: "irreducible", title: "the log is empty" },
+  "open-run-live":     { nature: "irreducible", title: "open runs shown as working" },
+  "open-run-settled":  { nature: "derived",     title: "open runs the log itself closed out" },
+  "orphan-complete":   { nature: "unresolved",  title: "completions with no matching start" },
+  "cross-label-pair":  { nature: "derived",     title: "runs bracketed under two different labels" },
+  "derived-duration":  { nature: "derived",     title: "durations derived from timestamps" },
+  "agent-alias":       { nature: "derived",     title: "agent ids mapped onto a desk" },
+  "agent-machinery":   { nature: "irreducible", title: "pipeline machinery, which has no desk" },
+  "agent-no-desk":     { nature: "unresolved",  title: "agent ids with no desk on this floor" },
+  "desk-shared":       { nature: "irreducible", title: "desks showing merged logs" },
+  "gate-attributed":   { nature: "irreducible", title: "time attributed to a gate by approximation" },
+  "gate-skipped":      { nature: "irreducible", title: "gates skipped by this feature's track" },
+  "cycle-rail":        { nature: "irreducible", title: "what the gate rail covers" },
+  "tokens-missing":    { nature: "irreducible", title: "runs with no token usage recorded" },
+  "tokens-unmatched":  { nature: "unresolved",  title: "run_usage events that matched no run" },
+  "task-no-workplan":  { nature: "derived",     title: "tasks shown from the record alone" },
+  "task-unrecorded":   { nature: "unresolved",  title: "tasks with no usable record behind them" },
+  "task-unattributed": { nature: "unresolved",  title: "runs that named no task" },
+  "task-unplaceable":  { nature: "unresolved",  title: "runs naming a task the board has no row for" },
+  "state-unreadable":  { nature: "unresolved",  title: "state.json could not be read" },
+  "other":             { nature: "unresolved",  title: "other" },
+};
+
+// Defects first: they are the ones somebody can act on. Standing caveats last.
+const NATURE_ORDER = ["unresolved", "derived", "irreducible"];
+
+function createGaps() {
+  const entries = [];
+  const g = {
+    add(kind, text) {
+      const meta = GAP_KINDS[kind] || GAP_KINDS.other;
+      entries.push({ kind, nature: meta.nature, text });
+      return g;
+    },
+    // Legacy shape. Callers that have nothing better to say still land in a kind.
+    push(text) { return g.add("other", text); },
+    get length() { return entries.length; },
+    lines() { return entries.map((e) => e.text); },
+    groups() {
+      const byKind = new Map();
+      for (const e of entries) {
+        if (!byKind.has(e.kind)) byKind.set(e.kind, []);
+        byKind.get(e.kind).push(e.text);
+      }
+      return Array.from(byKind, ([kind, lines]) => {
+        const meta = GAP_KINDS[kind] || GAP_KINDS.other;
+        return { kind, title: meta.title, nature: meta.nature, count: lines.length, lines };
+      }).sort((a, b) =>
+        NATURE_ORDER.indexOf(a.nature) - NATURE_ORDER.indexOf(b.nature) || b.count - a.count);
+    },
+  };
+  return g;
+}
+
+/* ============================================================
    ARGS
    ============================================================ */
 
@@ -172,6 +304,7 @@ function readEvents(logPath, gaps) {
   if (!fs.existsSync(logPath)) return [];
   const lines = fs.readFileSync(logPath, "utf8").split("\n");
   const events = [];
+  const aliasNoted = new Set();
   lines.forEach((line, i) => {
     const trimmed = line.trim();
     if (!trimmed) return;
@@ -180,12 +313,27 @@ function readEvents(logPath, gaps) {
       e._line = i + 1;
       e._t = Date.parse(e.ts);
       if (Number.isNaN(e._t)) {
-        gaps.push(`events.jsonl line ${i + 1}: unparseable ts '${e.ts}' — event ignored.`);
+        gaps.add("log-unreadable", `events.jsonl line ${i + 1}: unparseable ts '${e.ts}' — event ignored.`);
         return;
+      }
+      // Once, here, so pairing, token matching, the task board and the desks can
+      // never disagree about who an event belongs to.
+      const norm = normaliseAgent(e.agent);
+      if (norm.alias) {
+        e._alias = norm.alias;
+        e.agent = norm.agent;
+        // A per-task instance id carries the task the run was given. Reading it
+        // off the id is what lets the board attribute runs that named no `task`.
+        if (norm.task && !e.task) e.task = norm.task;
+        if (!aliasNoted.has(norm.alias)) {
+          aliasNoted.add(norm.alias);
+          gaps.add("agent-alias", `agent id '${norm.alias}' is not a roster id — read as '${norm.agent}'` +
+            (norm.task ? ` working on ${norm.task}` : "") + `, so its runs appear on that desk rather than being dropped.`);
+        }
       }
       events.push(e);
     } catch {
-      gaps.push(`events.jsonl line ${i + 1}: not valid JSON — line ignored.`);
+      gaps.add("log-unreadable", `events.jsonl line ${i + 1}: not valid JSON — line ignored.`);
     }
   });
   // The log is append-only and should already be chronological; sorting defends
@@ -201,6 +349,7 @@ function readEvents(logPath, gaps) {
 function pairRuns(events, gaps) {
   const open = new Map();          // key -> [phase_start, ...] in arrival order
   const runs = [];
+  const orphans = [];              // run_complete with no start under its own key
   const key = (e) => `${e.agent} ${e.phase} ${e.cycle ?? 1}`;
 
   for (const e of events) {
@@ -230,20 +379,78 @@ function pairRuns(events, gaps) {
         const start = queue.splice(idx, 1)[0];
         runs.push(makeRun(start, e, gaps));
       } else {
-        // run_complete with no start — render it as an instant, and say so.
-        gaps.push(`${e.agent} in ${e.phase} (cycle ${e.cycle ?? 1}): run_complete with no matching phase_start — rendered as a zero-length step.`);
-        runs.push(makeRun({ ...e, _t: e._t - (e.duration_ms || 0) }, e, gaps));
+        // Held, not rendered yet: the start it belongs to may have been written
+        // under a different label, and the pass below is what finds it.
+        orphans.push(e);
       }
     }
   }
 
-  // Anything still open at the end of the log is a run with no run_complete.
-  // Whether it is live or interrupted is decided by classifyOpenRuns below, which
-  // can often tell from what the rest of the log did afterwards.
-  for (const [, queue] of open) {
-    for (const start of queue) {
-      runs.push(makeRun(start, null, gaps));
+  // Second pass — the two halves of one run, bracketed under different labels.
+  //
+  // A phase_start and its run_complete do not always agree on the phase. An
+  // agent that plans in one phase and executes in another (qa-functional), one
+  // resumed under a different mode, a debugger that opened under the issue it
+  // was chasing and closed under the phase it fixed — each writes the bracket
+  // under two keys. The first pass then sees two separate faults: a run that was
+  // never closed, and a completion out of nowhere. They are one run, and the
+  // floor was reporting that desk as still working days later while drawing a
+  // zero-length step for the same work beside it.
+  //
+  // Pair only on the completion's own duration_ms. That number is the agent's
+  // measurement of when it began; landing on a start it never named is evidence,
+  // not a guess. Without it there is nothing to test against, so the halves stay
+  // apart and both are reported.
+  const taken = new Set();
+  const stillOpen = [];
+  for (const [, queue] of open) for (const st of queue) stillOpen.push(st);
+  stillOpen.sort((a, b) => a._t - b._t);
+
+  const stillOrphan = [];
+  for (const c of orphans) {
+    if (typeof c.duration_ms !== "number") { stillOrphan.push(c); continue; }
+    const target = c._t - c.duration_ms;
+    // Generous on long runs, tight on short ones: an agent writes both stamps
+    // itself, so the only spread is the write, not the work.
+    const tolerance = Math.max(60000, c.duration_ms * 0.05);
+    let best = null, bestD = Infinity;
+    for (const st of stillOpen) {
+      if (taken.has(st)) continue;
+      if (st.agent !== c.agent) continue;
+      if ((st.cycle ?? 1) !== (c.cycle ?? 1)) continue;
+      if (st.phase === c.phase) continue;      // same key — the first pass owns it
+      if (st._t > c._t) continue;
+      // Two halves of one run name one task. Where both name one and they
+      // differ, the arithmetic lining up is a coincidence, not evidence.
+      if (st.task && c.task && st.task !== c.task) continue;
+      const d = Math.abs(st._t - target);
+      if (d < bestD) { bestD = d; best = st; }
     }
+    if (best && bestD <= tolerance) {
+      taken.add(best);
+      gaps.add("cross-label-pair", `${c.agent} (cycle ${c.cycle ?? 1}): phase_start under '${best.phase}' and run_complete under '${c.phase}' — paired as one run because the completion's own duration_ms lands on that start (within ${Math.round(bestD / 1000)}s). The desk is neither shown as still working nor drawn twice.`);
+      const paired = makeRun(best, c, gaps);
+      // The run keeps the phase its start named, so the other label survives for
+      // anything matching on phase — the usage events, in practice.
+      paired.altPhase = c.phase;
+      runs.push(paired);
+    } else {
+      stillOrphan.push(c);
+    }
+  }
+
+  for (const c of stillOrphan) {
+    // run_complete with no start anywhere — render it as an instant, and say so.
+    gaps.add("orphan-complete", `${c.agent} in ${c.phase} (cycle ${c.cycle ?? 1}): run_complete with no matching phase_start — rendered as a zero-length step.`);
+    runs.push(makeRun({ ...c, _t: c._t - (c.duration_ms || 0) }, c, gaps));
+  }
+
+  // Anything still open is a run with no run_complete under any label. Whether it
+  // is live or interrupted is decided by classifyOpenRuns below, which can often
+  // tell from what the rest of the log did afterwards.
+  for (const start of stillOpen) {
+    if (taken.has(start)) continue;
+    runs.push(makeRun(start, null, gaps));
   }
 
   runs.sort((a, b) => a.start - b.start);
@@ -261,7 +468,7 @@ function makeRun(start, complete, gaps) {
     // the floor's modal renders as "not started yet" — a false statement about a
     // desk that demonstrably ran.
     duration = complete._t - start._t;
-    gaps.push(`${agent} in ${phase} (cycle ${cycle}): run_complete carried no duration_ms — derived ${duration}ms from the timestamp gap.`);
+    gaps.add("derived-duration", `${agent} in ${phase} (cycle ${cycle}): run_complete carried no duration_ms — derived ${duration}ms from the timestamp gap.`);
   }
   return {
     agent, phase, cycle,
@@ -292,18 +499,41 @@ function makeRun(start, complete, gaps) {
 // session died (protocol 3a). Rendering every one as "working" is how a floor
 // ends up claiming sixteen concurrent agents, four of them for days.
 //
-// The log cannot say directly, but twice it says so by implication:
+// The log cannot say directly, but four times it says so by implication:
 //
 //   1. the run belongs to a cycle older than the current one — opening the next
 //      cycle closed that one, and nothing in a closed cycle is still working;
 //   2. a gate outcome for the run's own phase and cycle was recorded after it
-//      started — the phase reached a verdict without it.
+//      started — the phase reached a verdict without it;
+//   3. the same agent started the same phase and cycle again afterwards — per
+//      protocol 3a that is what happens TO an interrupted run, and the re-run is
+//      the bracket that counts;
+//   4. /sdlc-resume ran after it started — reconciling the workspace is the act
+//      of settling everything left open before it, so a run the resume record
+//      covers is finished business whatever its own bracket says.
 //
-// Anything neither rule catches is treated as live, which is the only safe
-// default: calling a working agent dead would hide the thing the floor exists
-// to show.
+// Rules 3 and 4 are why a floor could show a dozen desks working: the pipeline
+// had already dealt with every one of them, in the log, in a way the first two
+// rules do not look at.
+//
+// Anything no rule catches is treated as live, which is the only safe default:
+// calling a working agent dead would hide the thing the floor exists to show.
 function classifyOpenRuns(runs, events, currentCycle, gaps) {
   const gateEvents = events.filter((e) => e.event === "gate_passed" || e.event === "gate_failed");
+  // Recovery runs, in time order. The first one after an open start settles it.
+  const recoveries = events.filter((e) => e.event === "phase_start" && RECOVERY_AGENTS.has(e.agent));
+  // Every phase_start, by the key a re-run would reuse — with the task it named,
+  // because that key is also what a whole parallel fan-out shares. Three
+  // implementers running concurrently write one agent, one phase and one cycle
+  // between them (see pairRuns), so a later start under the same key is a re-run
+  // only when it is the same unit of work.
+  const startsByKey = new Map();
+  for (const e of events) {
+    if (e.event !== "phase_start") continue;
+    const k = `${e.agent} ${e.phase} ${e.cycle ?? 1}`;
+    if (!startsByKey.has(k)) startsByKey.set(k, []);
+    startsByKey.get(k).push({ t: e._t, task: e.task || null });
+  }
   const stalled = [];
   let live = 0;
   for (const r of runs) {
@@ -315,6 +545,15 @@ function classifyOpenRuns(runs, events, currentCycle, gaps) {
     } else {
       const g = gateEvents.find((e) => e.phase === r.phase && (e.cycle ?? 1) === cycle && e._t > r.start);
       if (g) why = `the ${r.phase} gate was recorded ${g.event === "gate_failed" ? "failed" : "passed"} while it was still open`;
+    }
+    if (!why) {
+      const again = (startsByKey.get(`${r.agent} ${r.phase} ${cycle}`) || [])
+        .some((st) => st.t > r.start && st.task === (r.task || null));
+      if (again) why = `the same ${r.task ? r.task + " " : ""}run started ${r.phase} again in this cycle, which is how an interrupted run is re-run`;
+    }
+    if (!why) {
+      const rec = recoveries.find((e) => e._t > r.start);
+      if (rec) why = `${rec.agent} reconciled this workspace afterwards, which settles every run left open before it`;
     }
     if (why) {
       r.stalled = true;
@@ -330,10 +569,10 @@ function classifyOpenRuns(runs, events, currentCycle, gaps) {
     else live++;
   }
   for (const r of stalled) {
-    gaps.push(`${r.agent} in ${r.phase} (cycle ${r.cycle ?? 1}): phase_start with no run_complete, and ${r.stalledWhy} — shown as stalled, not working. Its time is not counted.`);
+    gaps.add("open-run-settled", `${r.agent} in ${r.phase} (cycle ${r.cycle ?? 1}): phase_start with no run_complete, and ${r.stalledWhy} — shown as stalled, not working. Its time is not counted.`);
   }
   if (live) {
-    gaps.push(`${live} run(s) have a phase_start with no run_complete and nothing in the log that closed them — shown as working. From the log alone, running now and interrupted a moment ago look identical.`);
+    gaps.add("open-run-live", `${live} run(s) have a phase_start with no run_complete and nothing in the log that closed them — shown as working. From the log alone, running now and interrupted a moment ago look identical.`);
   }
   return stalled.length;
 }
@@ -385,7 +624,9 @@ function loadSignoffs(runsDir) {
     if (!name.endsWith(".md")) continue;
     const m = name.match(/^(.+?)-(sdlc-.+)\.md$/);
     if (!m) continue;
-    const agent = m[2];
+    // Run files are named from the same id the events carry, aliases included,
+    // so normalise here too or a renamed agent's caveat never finds its desk.
+    const agent = normaliseAgent(m[2]).agent;
     let text;
     try { text = fs.readFileSync(path.join(runsDir, name), "utf8"); } catch { continue; }
     const block = text.match(/##\s*Sign-off([\s\S]*?)(?=\n##\s|\s*$)/i);
@@ -417,13 +658,18 @@ function buildState(root, slug) {
   const featureDir = path.join(root, ".sdlc", "features", slug);
   const logPath = path.join(featureDir, "history", "events.jsonl");
   const runsDir = path.join(featureDir, "history", "runs");
-  const gaps = [];
+  const gaps = createGaps();
   const now = Date.now();
 
   const events = readEvents(logPath, gaps);
   if (!events.length) {
+    // Through `gaps`, not around it: anything readEvents already filed — an
+    // unreadable line, a bad timestamp — is why the log looks empty, and the
+    // CLI prints from the groups.
+    gaps.add("log-empty", `no events in ${logPath} — nothing has run yet.`);
     return { slug, empty: true, generatedAt: now,
-      gaps: [`no events in ${logPath} — nothing has run yet.`],
+      gaps: gaps.lines(),
+      gapGroups: gaps.groups(),
       steps: [], desks: {}, plan: [], upNext: [], roster: [], tasks: [], nowRunning: [],
       gateStatus: {}, skippedGates: [], gates: GATES, stalled: 0,
       tokens: { total: 0, reportedRuns: 0, totalRuns: 0 } };
@@ -462,7 +708,7 @@ function buildState(root, slug) {
       if (!implSlots.has(taskKey)) {
         const used = cycleSlotCounter.n++;
         if (used >= slotNames.length && !slotCollisionNoted) {
-          gaps.push(`a step ran more than ${slotNames.length} implementer tasks concurrently — the extra tasks share desks A/B/C, so those desks show merged logs.`);
+          gaps.add("desk-shared", `a step ran more than ${slotNames.length} implementer tasks concurrently — the extra tasks share desks A/B/C, so those desks show merged logs.`);
           slotCollisionNoted = true;
         }
         implSlots.set(taskKey, slotNames[used % slotNames.length]);
@@ -470,8 +716,17 @@ function buildState(root, slug) {
       return implSlots.get(taskKey);
     }
     if (DESK_IDS.has(run.agent)) return run.agent;
+    // Machinery has no desk by design. Filing it under "unknown agent" invited
+    // somebody to go looking for a desk that was never meant to exist.
+    if (MACHINERY_AGENTS.has(run.agent)) {
+      if (!unknownAgentsNoted.has(run.agent)) {
+        gaps.add("agent-machinery", `'${run.agent}' runs the pipeline rather than a phase of it, so it has no desk on this floor by design — its runs are omitted here and still counted in /sdlc-timing.`);
+        unknownAgentsNoted.add(run.agent);
+      }
+      return null;
+    }
     if (!unknownAgentsNoted.has(run.agent)) {
-      gaps.push(`agent '${run.agent}' has no desk on this floor — its runs are omitted from the visualization (it still counts in /sdlc-timing).`);
+      gaps.add("agent-no-desk", `agent '${run.agent}' has no desk on this floor and is not a known alias of one — its runs are omitted from the visualization (they still count in /sdlc-timing). Add it to DESK_IDS, or to AGENT_ALIASES if it is another name for a desk that exists.`);
       unknownAgentsNoted.add(run.agent);
     }
     return null;
@@ -482,7 +737,7 @@ function buildState(root, slug) {
       // Count toward whichever gate was most recently failed before this run.
       const contested = gateEvents.filter((g) => g.event === "gate_failed" && g._t <= run.start).pop();
       if (!floatingNoted) {
-        gaps.push(`sdlc-debugger has no fixed gate — its time is attributed to the most recently failed gate, an approximation. Fix-mode sdlc-implementer is not separable from ordinary implementation in the log, so its time counts toward the implementation gate.`);
+        gaps.add("gate-attributed", `sdlc-debugger has no fixed gate — its time is attributed to the most recently failed gate, an approximation. Fix-mode sdlc-implementer is not separable from ordinary implementation in the log, so its time counts toward the implementation gate.`);
         floatingNoted = true;
       }
       if (contested) return PHASE_GATE[contested.phase] || AGENT_GATE[contested.agent] || null;
@@ -659,7 +914,7 @@ function buildState(root, slug) {
   // Skipped gates — recorded in state.json by the pipeline, not derivable here.
   const skipped = readSkippedGates(featureDir, gaps);
   for (const g of skipped) {
-    gaps.push(`gate '${g}' was skipped by this feature's track — the floor marks its pill "skipped".`);
+    gaps.add("gate-skipped", `gate '${g}' was skipped by this feature's track — the floor marks its pill "skipped".`);
   }
 
   const firstTs = events[0]._t;
@@ -667,9 +922,9 @@ function buildState(root, slug) {
   // Stalled runs are not running, whatever their missing run_complete implies.
   // Counting them here is what kept a header reading "pipeline running" on a
   // feature whose last real activity was days earlier.
-  const anyRunning = runs.some((r) => r.running && !r.stalled);
+  const anyRunning = runs.some((r) => isDrawn(r) && r.running && !r.stalled);
   if (cycles > 2) {
-    gaps.push(`this feature reached cycle ${cycles}; the floor's cycle badge shows the real number, but the gate rail only reflects the latest cycle's outcomes.`);
+    gaps.add("cycle-rail", `this feature reached cycle ${cycles}; the floor's cycle badge shows the real number, but the gate rail only reflects the latest cycle's outcomes.`);
   }
 
   // state.json is the pipeline's own record of what is still open; the event
@@ -756,7 +1011,11 @@ function buildState(root, slug) {
     tasks,
     nowRunning,
     steps,
-    gaps,
+    // Both shapes of the same record: the flat list every existing reader
+    // expects, and the same lines filed by kind and nature so a report can lead
+    // with "29 completions with no matching start" instead of 29 sentences.
+    gaps: gaps.lines(),
+    gapGroups: gaps.groups(),
   };
 }
 
@@ -878,7 +1137,7 @@ function readSkippedGates(featureDir, gaps) {
       return v === "skipped" || (v && v.status === "skipped");
     });
   } catch {
-    gaps.push(`state.json could not be parsed — skipped gates could not be identified.`);
+    gaps.add("state-unreadable", `state.json could not be parsed — skipped gates could not be identified.`);
     return [];
   }
 }
@@ -904,9 +1163,19 @@ function attachTokens(runs, events, gaps) {
   const usage = events.filter((e) => e.event === "run_usage");
   let unmatched = 0;
   for (const u of usage) {
-    const pool = runs.filter((r) => r.agent === u.agent && r.phase === u.phase
-      && (r.cycle ?? 1) === (u.cycle ?? 1) && r.tokens == null
-      && (!u.task || !r.task || r.task === u.task));
+    const free = (r) => r.tokens == null && (!u.task || !r.task || r.task === u.task);
+    let pool = runs.filter((r) => r.agent === u.agent && r.phase === u.phase
+      && (r.cycle ?? 1) === (u.cycle ?? 1) && free(r));
+    // A run whose two halves were written under different labels keeps the
+    // phase its start named, which the orchestrator's usage event need not
+    // share — it normally carries the other one. Match on that second label
+    // too, rather than throwing away cost that was recorded. Only cross-labelled
+    // runs are eligible, so a usage event can never drift onto an unrelated run
+    // of the same agent in the same cycle.
+    if (!pool.length) {
+      pool = runs.filter((r) => r.agent === u.agent && r.altPhase === u.phase
+        && (r.cycle ?? 1) === (u.cycle ?? 1) && free(r));
+    }
     if (!pool.length) { unmatched++; continue; }
     let best = pool[0], bestD = Infinity;
     for (const r of pool) {
@@ -918,11 +1187,11 @@ function attachTokens(runs, events, gaps) {
     if (u.task && !best.task) best.task = u.task;
   }
   if (unmatched) {
-    gaps.push(`${unmatched} run_usage event(s) matched no run — their token cost is not shown on any desk.`);
+    gaps.add("tokens-unmatched", `${unmatched} run_usage event(s) matched no run — their token cost is not shown on any desk.`);
   }
   const missing = runs.filter((r) => !r.running && r.tokens == null).length;
   if (missing) {
-    gaps.push(`${missing} completed run(s) carry no token usage — those desks read "not reported". The total is the sum of what was recorded, never an estimate of what was not.`);
+    gaps.add("tokens-missing", `${missing} completed run(s) carry no token usage — those desks read "not reported". The total is the sum of what was recorded, never an estimate of what was not.`);
   }
 }
 
@@ -983,14 +1252,14 @@ function loadTasks(featureDir, gaps) {
       if (!t) {
         // A task record with no workplan entry still describes real work; show it
         // rather than dropping it, and say where it came from.
-        gaps.push(`${id} has an implementation record but no entry in 05-architecture/workplan.md — shown on the board from the task record alone.`);
+        gaps.add("task-no-workplan", `${id} has an implementation record but no entry in 05-architecture/workplan.md — shown on the board from the task record alone.`);
         t = { id, title: "", ownerRole: null, stories: [], dependsOn: [], parallelWith: [],
           status: "pending", recorded: false,
           desk: null, startedAt: null, endedAt: null, ms: 0, tokens: null, running: false };
         tasks.push(t); byId.set(id, t);
       }
       if (!status) {
-        gaps.push(`${id}: 07-implementation/${name} carries no readable status frontmatter — the record is empty or partial, so the board cannot say what the task produced.`);
+        gaps.add("task-unrecorded", `${id}: 07-implementation/${name} carries no readable status frontmatter — the record is empty or partial, so the board cannot say what the task produced.`);
         continue;
       }
       t.status = status;                       // complete | partial | blocked
@@ -1005,11 +1274,15 @@ function loadTasks(featureDir, gaps) {
 function attachTaskRuns(tasks, runs, gaps) {
   const byId = new Map(tasks.map((t) => [t.id, t]));
   let unattributed = 0;
+  const unplaceable = new Set();
   for (const r of runs) {
     if (r.agent !== "sdlc-implementer") continue;
     if (!r.task) { unattributed++; continue; }
     const t = byId.get(r.task);
-    if (!t) continue;
+    // The run names its work and the board still cannot place it: no workplan
+    // entry and no task record. Dropping that silently is the one thing this
+    // floor must not do — the desks show the time with nothing to attach it to.
+    if (!t) { unplaceable.add(r.task); continue; }
     t.desk = r._desk || t.desk;
     t.startedAt = t.startedAt == null ? r.start : Math.min(t.startedAt, r.start);
     if (r.running) { t.running = true; t.status = "running"; }
@@ -1020,7 +1293,10 @@ function attachTaskRuns(tasks, runs, gaps) {
     if (typeof r.tokens === "number") t.tokens = (t.tokens || 0) + r.tokens;
   }
   if (unattributed) {
-    gaps.push(`${unattributed} implementer run(s) named no task — the board cannot say which workplan task they built, so they appear only on the desks.`);
+    gaps.add("task-unattributed", `${unattributed} implementer run(s) named no task — the board cannot say which workplan task they built, so they appear only on the desks.`);
+  }
+  if (unplaceable.size) {
+    gaps.add("task-unplaceable", `${Array.from(unplaceable).sort().join(", ")} — named by an implementer run but absent from both 05-architecture/workplan.md and 07-implementation/, so the board has no row to put that run on and it appears only on the desks.`);
   }
   // A task whose run started and finished, with no 07-implementation/TASK-<NNN>.md
   // behind it, has an outcome nobody recorded. Leaving it "pending" states the
@@ -1032,7 +1308,7 @@ function attachTaskRuns(tasks, runs, gaps) {
     t.status = "unknown";
   }
   if (unrecorded.length) {
-    gaps.push(`${unrecorded.length} task(s) ran to completion with no usable outcome behind them — 07-implementation/TASK-<NNN>.md is missing or unreadable — so the board shows them "unknown": the log proves the run finished, but nothing records what it produced.`);
+    gaps.add("task-unrecorded", `${unrecorded.length} task(s) ran to completion with no usable outcome behind them — 07-implementation/TASK-<NNN>.md is missing or unreadable — so the board shows them "unknown": the log proves the run finished, but nothing records what it produced.`);
   }
 }
 
@@ -1126,7 +1402,7 @@ function buildPlan(gateStatus, runs, skipped, now) {
 // unpaired phase_starts, which is also why the floor cannot tell "running" from
 // "interrupted" — both look exactly like this in the log.
 function buildNow(runs, now) {
-  return runs.filter((r) => r.running && !r.stalled).map((r) => ({
+  return runs.filter((r) => isDrawn(r) && r.running && !r.stalled).map((r) => ({
     agent: r.agent, desk: r._desk || null, phase: r.phase, cycle: r.cycle,
     gate: AGENT_GATE[r.agent] || PHASE_GATE[r.phase] || null,
     task: r.task, model: r.model,
@@ -1300,9 +1576,15 @@ if (args.serve) {
   } else {
     const dir = writeStatic(args.root, slug, state);
     process.stdout.write(`floor: wrote ${path.join(dir, "pipeline-floor.html")}\n`);
+    // Grouped, defects first. A hundred and forty loose sentences is the same
+    // information nobody reads; the kind and the count are what belong in a
+    // report, with the detail underneath them.
     if (state.gaps.length) {
       process.stdout.write(`gaps (${state.gaps.length}):\n`);
-      state.gaps.forEach((g) => process.stdout.write(`  - ${g}\n`));
+      (state.gapGroups || []).forEach((g) => {
+        process.stdout.write(`  [${g.nature}] ${g.count > 1 ? g.count + " · " : ""}${g.title}\n`);
+        g.lines.forEach((l) => process.stdout.write(`      - ${l}\n`));
+      });
     }
   }
 }
