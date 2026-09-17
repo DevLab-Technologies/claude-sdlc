@@ -126,7 +126,11 @@ const FLOATING_AGENTS = new Set(["sdlc-debugger", "sdlc-implementer"]);
 // pairing, tokens, the task board and the desks all see one id per agent.
 // Machinery is not a defect in the log and never will be, so it is reported as a
 // deliberate omission rather than as an unknown agent nobody can act on.
-const AGENT_ALIASES = {
+// Null-prototype: the id comes from the log, and a plain literal answers to
+// `constructor`, `toString` and `valueOf` with an inherited function, which was
+// then written back onto the event as its agent and carried into the desk
+// lookups, the roster keys and the state the floor renders.
+const AGENT_ALIASES = Object.assign(Object.create(null), {
   "sdlc-research-internal": "sdlc-researcher-findings",
   "sdlc-research-findings": "sdlc-researcher-findings",
   "sdlc-research-external": "sdlc-researcher-prior-art",
@@ -136,7 +140,7 @@ const AGENT_ALIASES = {
   "sdlc-reviewer-correctness": "sdlc-code-reviewer",
   "sdlc-ux-audit": "sdlc-ux-auditor",
   "sdlc-qa-func": "sdlc-qa-functional",
-};
+});
 
 // Machinery: it runs the pipeline rather than a phase of it. Omitted from the
 // floor by design, which is a different statement from "this agent is unknown".
@@ -505,9 +509,13 @@ function makeRun(start, complete, gaps) {
 //      cycle closed that one, and nothing in a closed cycle is still working;
 //   2. a gate outcome for the run's own phase and cycle was recorded after it
 //      started — the phase reached a verdict without it;
-//   3. the same agent started the same phase and cycle again afterwards — per
-//      protocol 3a that is what happens TO an interrupted run, and the re-run is
-//      the bracket that counts;
+//   3. the same unit of work — the same task id — was started again under that
+//      agent, phase and cycle. Per protocol 3a that is what happens TO an
+//      interrupted run, and the re-run is the bracket that counts. The named
+//      task is what makes it evidence: a whole parallel fan-out shares one
+//      agent, one phase and one cycle between its members (see pairRuns), so
+//      where no task is named a later start is just as likely to be a colleague
+//      still working alongside this one;
 //   4. /sdlc-resume ran after it started — reconciling the workspace is the act
 //      of settling everything left open before it, so a run the resume record
 //      covers is finished business whatever its own bracket says.
@@ -525,8 +533,13 @@ function classifyOpenRuns(runs, events, currentCycle, gaps) {
   // Every phase_start, by the key a re-run would reuse — with the task it named,
   // because that key is also what a whole parallel fan-out shares. Three
   // implementers running concurrently write one agent, one phase and one cycle
-  // between them (see pairRuns), so a later start under the same key is a re-run
-  // only when it is the same unit of work.
+  // between them (see pairRuns), and none of them need name a task, so a later
+  // start is a re-run only where both brackets name the SAME one. Matching two
+  // absent tasks to each other read a live fan-out as each member re-running the
+  // last — every desk but one stalled while all of them were working. Where
+  // neither names a task the log genuinely cannot tell the two apart: rules 1
+  // and 2 still catch most of those, and what is left is disclosed as the
+  // coin-toss it is rather than guessed at.
   const startsByKey = new Map();
   for (const e of events) {
     if (e.event !== "phase_start") continue;
@@ -547,9 +560,9 @@ function classifyOpenRuns(runs, events, currentCycle, gaps) {
       if (g) why = `the ${r.phase} gate was recorded ${g.event === "gate_failed" ? "failed" : "passed"} while it was still open`;
     }
     if (!why) {
-      const again = (startsByKey.get(`${r.agent} ${r.phase} ${cycle}`) || [])
-        .some((st) => st.t > r.start && st.task === (r.task || null));
-      if (again) why = `the same ${r.task ? r.task + " " : ""}run started ${r.phase} again in this cycle, which is how an interrupted run is re-run`;
+      const again = r.task && (startsByKey.get(`${r.agent} ${r.phase} ${cycle}`) || [])
+        .some((st) => st.t > r.start && st.task === r.task);
+      if (again) why = `${r.task} was started again in ${r.phase} in this cycle, which is how an interrupted run is re-run`;
     }
     if (!why) {
       const rec = recoveries.find((e) => e._t > r.start);
