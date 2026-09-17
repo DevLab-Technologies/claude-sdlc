@@ -13,8 +13,10 @@ Agents run concurrently where work is independent. Four hazards, four rules:
    never apply them.
 3. **Shared runtime** — build, suite, server, and fixtures are exercised **once per group**,
    never once per member. No parallel member starts a server or runs the full suite. Where the
-   group *reads* a runtime fact, that run comes **before** the fan-out, into a file the group reads
-   — the review phase, section 9a. Where the group *produces* the tree, it comes **at the join**,
+   group *reads* a runtime fact, one designated runner takes it into a file the group reads:
+   **before** the fan-out where every member blocks on it (verify-fast), and **alongside** the
+   fan-out where only one member needs it (verify-slow, which the tests lens waits for) — the
+   review phase, section 9a. Where the group *produces* the tree, it comes **at the join**,
    once every member has returned — the implementation phase, section 9b. A member cannot honestly
    take the measurement earlier: the working tree it would measure is one its peers are still
    editing. Need a measurement nobody took? Record it in `## Not covered`.

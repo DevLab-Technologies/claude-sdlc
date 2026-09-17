@@ -56,6 +56,11 @@ The protocol core is all you need; read from its `sections/` directory only if t
    contract and records an ADR first. Otherwise -> `sdlc-implementer` in fix mode, fixing
    the **root cause**, adding the regression test the investigation specified, and clearing
    every blast-radius site as its own linked issue.
+   - **Tell it that it runs alone, with no join behind it.** This command launches no
+     `sdlc-review-lead`, so nothing after the implementer builds the tree or runs the suite. It
+     verifies in full itself (protocol 9b), including any step of the issue that needs a running
+     app. An implementer left to guess assumes the group, scopes its run to its own files, and
+     leaves the regression to a join that never happens.
 
 7. **Verify.** `sdlc-code-reviewer` reviews the fix; `sdlc-qa-functional` runs the
    investigation's reproduction steps plus the regression test, and re-runs the surrounding

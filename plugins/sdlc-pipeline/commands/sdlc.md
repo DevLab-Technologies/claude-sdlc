@@ -238,10 +238,12 @@ Rules for the sequence:
   the findings, run `sdlc-implementer` in fix mode, then re-run the **same** reviewer to verify
   its own findings are closed — it may re-verify what it found, since it did not fix it. Loop at
   most twice. **Re-run verify-fast when the fixers return, before the reviewer**, and verify-slow
-  before the gate: fix-mode implementers are scoped the same way phase 7's are (protocol 9b), and
-  a static lens may not build, so without those two runs the review gate signs "build and suite
-  green" over a tree nobody compiled since the fixes landed. If blockers survive two fix attempts,
-  stop looping and let the cycle close; two failed fixes mean the cause was never found, and
+  before the gate — and when the reviewer being re-run is `sdlc-review-tests`, re-run verify-slow
+  **before that lens too**, since it compares suite results against the plan and has nothing to read
+  otherwise (protocol 9a rule 3). Fix-mode implementers are scoped the same way phase 7's are
+  (protocol 9b), and a static lens may not build, so without those runs the review gate signs
+  "build and suite green" over a tree nobody compiled since the fixes landed. If blockers survive
+  two fix attempts, stop looping and let the cycle close; two failed fixes mean the cause was never found, and
   protocol section 4 (Triage) sends it to `sdlc-debugger`.
 - Never accept a reviewer's `passed` after an implementer changed code the reviewer has not
   re-read. Re-run the reviewer, or the sign-off refers to code that no longer exists.

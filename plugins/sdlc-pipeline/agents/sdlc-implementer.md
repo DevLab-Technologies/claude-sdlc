@@ -137,12 +137,19 @@ When assigned issues instead of a task:
   cause once and say so in all three.
 - Update each `issues/ISSUE-<NNN>.md`: `status: fixed`, `cycle_fixed`, the files changed,
   and how you satisfied the issue's verification steps.
-- Re-run the verification steps written in the issue before marking it fixed. Fix mode groups are
-  parallel too — step 5's scoping applies, so run the issue's steps and the tests around your own
-  files, not the suite. If an issue's steps need a running app or seeded fixtures, say so in the
-  issue and leave them to the caller's join rather than starting one inside the group; a fix-mode
-  group gets the same verify-fast join a phase 7 group does, and the suite behind it, before any
-  gate is signed.
+- Re-run the verification steps written in the issue before marking it fixed. **Your launch tells
+  you whether a join follows you**, the same way step 5 tells you whether peers share your tree.
+  A fix-mode group inside a review cycle gets the same verify-fast join a phase 7 group does, and
+  the suite behind it, before any gate is signed: step 5's group scoping applies, so run the issue's
+  steps and the tests around your own files, not the suite. **Where no join follows** — a single
+  fix-mode run under `/sdlc-bug`, which launches no review lead at all — you are alone in step 5's
+  sense and run the project's build, lint, type check and suite yourself, because nobody after you
+  will.
+- **Never write `status: fixed` over a verification step nobody ran.** Steps needing a running app
+  or seeded fixtures are yours when you are alone. Inside a group, do not start one: leave the issue
+  `open`, name the steps you could not execute, and say so in your report. The join is build and type
+  check only and verify-slow smoke-tests the primary path, not your issue — so "left to the join" is
+  not somewhere those steps actually get run.
 - Never close an issue you disagree with — respond in the issue body and leave it `open`
   for the opener to resolve.
 

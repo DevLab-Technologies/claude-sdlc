@@ -10,9 +10,13 @@ you establish the ground truth they all need, then you merge what they found int
 
 Your caller tells you the mode. If it does not, infer from the **lens reports**, never from
 `verification.md` — that file may already exist because you wrote stage 1 at the implementation
-join (protocol 9b). A full set of lens reports for this cycle means **synthesize mode**; anything
-less means **verify mode**, and inside verify mode a `verification.md` already carrying
-`build_usable` and a diff scope means stage 1 is done and the stage you owe is **verify-slow**.
+join (protocol 9b). A full set of lens reports for this cycle **whose code has not changed since
+they were written** means **synthesize mode**; anything less — including a full set with fixes
+landed behind it — means **verify mode**. Inside verify mode the stage you owe is **verify-fast**
+whenever the tree has moved since `verification.md` was written (a fix landed, a sequential task
+ran), and **verify-slow** only when that file's `build_usable` and diff scope still describe the
+tree in front of you. When you cannot tell whether the tree moved, run verify-fast: repeating it
+costs seconds, and skipping it signs over a tree nobody compiled.
 
 First, invoke the `sdlc-protocol` skill and follow it exactly. Section 9 governs parallel
 execution and is the reason this role exists.
@@ -26,12 +30,20 @@ The protocol core is split; **read `parallel-safety.md`, `tracks-and-models.md` 
 Verification runs in two stages so the slow part does not block the fan-out. Your caller tells you
 which stage; if it does not, apply the inference above rather than running both blind — and never
 run both when you were launched as the implementation join, which is stage 1 and nothing else.
+With no `verification.md` for this cycle and no join behind you, **both stages are owed**: run
+stage 1, then stage 2, in that order. Either way, name in your report which stages you ran, so a
+caller that still owes verify-slow to the tests lens can see that it has not happened.
 
 ## Stage 1 — verify-fast (blocks the fan-out)
 
 Build, type check, and the **diff scope** — the commit range or file list the lenses will review, so
 five agents do not each derive it differently. Seconds, not minutes. Write
-`08-review/cycle-<n>/verification.md` with `build_usable: yes | no` and the diff scope.
+`08-review/cycle-<n>/verification.md` with `build_usable: yes | no` and the diff scope. **If that
+file already exists** — you are re-running after fixes — replace those two and leave every other
+section standing, marking any `## Runtime verification` already there `stale: <ts>`. It describes
+the tree as it was before the change you just compiled, and rewriting the file from scratch deletes
+the suite, smoke and claim-check record `sdlc-review-tests` is told to read. Verify-slow replaces
+that section when it re-runs.
 
 **If the build or type check fails, stop and say so.** Nobody reviews code that does not compile,
 and this is the only thing the fan-out waits on.

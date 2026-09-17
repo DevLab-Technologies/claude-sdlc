@@ -20,6 +20,13 @@ tree after a parallel implementation group (section 9b), so it is routinely writ
 still the current phase. Row 3 above is about a phase's **own** completing artifact — for the review
 gate that is the lead's `review-summary.md` sign-off, never `verification.md`.
 
+The same holds for the **event log**: a paired `sdlc-review-lead` run labelled `phase: 08-review`
+may be that join, written while `state.json` still reads `07-implementation` (section 9b requires
+the label). It is not evidence the pipeline reached phase 8 — never advance the position past an
+`implementation` gate still `pending`, or the sequential workplan tasks that had not run yet are
+dropped silently. And re-running anything that touches the tree stales that `verification.md`:
+phase 8 re-runs verify-fast rather than carrying it forward.
+
 Discard means move it aside, not delete it: rename to `<name>.interrupted-<ts>.md` so the evidence
 survives. A partial report can still show what an interrupted agent was seeing.
 
