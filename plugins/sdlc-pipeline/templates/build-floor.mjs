@@ -47,7 +47,13 @@ const DESK_IDS = new Set([
 // Agent id -> gate. Source of truth is the Agent → Gate table in commands/sdlc.md.
 // Resolved by agent first because sdlc-qa-ui and sdlc-qa-functional can log under
 // the same phase directory while counting toward different gates.
-const AGENT_GATE = {
+//
+// Null-prototype, like AGENT_ALIASES and for the same reason: the key is an
+// agent id or a phase directory straight out of the log. A plain literal answers
+// `valueOf` or `constructor` with an inherited function, which is truthy, so it
+// walks past every `if (!gate)` guard and lands in gateStatus as a key no gate
+// rail can read — taking the real outcome with it.
+const AGENT_GATE = Object.assign(Object.create(null), {
   "sdlc-intake": "intake",
   "sdlc-researcher-findings": "research",
   "sdlc-researcher-prior-art": "research",
@@ -67,17 +73,17 @@ const AGENT_GATE = {
   "sdlc-review-tests": "review",
   "sdlc-qa-ui": "ui-qa",
   "sdlc-release-gate": "release",
-};
+});
 
 // Phase directory -> gate, the fallback when the agent id is unknown or
 // context-dependent (sdlc-qa-functional plans in phase 6 and executes in phase 9).
-const PHASE_GATE = {
+const PHASE_GATE = Object.assign(Object.create(null), {
   "00-intake": "intake", "01-research": "research", "02-product": "product",
   "03-design": "design", "03b-figma": "figma-design", "04-ux-audit": "ux-audit",
   "05-architecture": "architecture", "06-test-plan": "test-plan",
   "07-implementation": "implementation", "08-review": "review",
   "09-qa": "qa", "10-ui-qa": "ui-qa", "11-release": "release",
-};
+});
 
 // Which desks a gate is expected to occupy. This is the only place the floor can
 // learn what has NOT happened yet: the event log records what ran, never what is
