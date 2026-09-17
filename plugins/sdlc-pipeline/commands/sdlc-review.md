@@ -40,6 +40,10 @@ The protocol core is split; **read `parallel-safety.md` from `${CLAUDE_PLUGIN_RO
 Launch `sdlc-review-lead` in **verify-fast** mode with the target: build, type check, and the diff
 scope. Seconds, not minutes.
 
+Always run it here. A standalone review has no implementation join behind it to carry a
+`verification.md` forward (protocol 9b), and a file left by an earlier run describes an earlier
+tree.
+
 **If it reports `build_usable: no`, stop here.** Report the failure with its actual output. Lenses
 reading code that does not compile produce reports about one broken build.
 

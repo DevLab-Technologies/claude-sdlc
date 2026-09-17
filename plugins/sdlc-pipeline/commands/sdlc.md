@@ -170,6 +170,27 @@ Rules for the sequence:
 - **Phase 7 implementers must be handed their `TC` ids**, from `06-test-plan/assignments.md`.
   An implementer launched without its assigned cases will invent its own tests, which is the
   failure mode this phase exists to prevent.
+- **Tell every implementer whether it is alone or one of a group, and verify the tree once at the
+  join.** A parallel implementer runs only the checks scoped to its own files; the full build and
+  suite belong to the join, not to each member — running the suite from inside the group measures a
+  tree the other members are still rewriting, and spends the same minutes once per member
+  (protocol section 9 rule 3, section 9b). So when a parallel group returns, launch
+  `sdlc-review-lead` **verify-fast** before you set the implementation gate. Without it the gate
+  claims `passed` for a tree nobody compiled. It is not an extra run: verify-fast is the first
+  thing phase 8 does, it takes seconds, and its `verification.md` carries into phase 8 **as long as
+  nothing has touched the tree since** — if sequential (conflicting) tasks ran after the join, or a
+  fix landed, that file describes a tree that no longer exists, so run verify-fast again and let it
+  overwrite. Tell the lead to bracket the run as phase `08-review` whichever phase launched it, so
+  `/sdlc-timing` and the floor file one run under one gate. If it reports `build_usable: no`, that
+  is not a review finding and gets no `ISSUE` id: you fail the **implementation** gate, record
+  `gate_failed` naming the files it points at, re-launch the implementers who own them, and re-run
+  the join when they return. Do not fan out the review.
+- **Fan-out width comes from the workplan, not from you** (protocol section 9b). There is no dial
+  for "more implementers": the count is one per task, and only `parallel_with` tasks run together.
+  More tasks over the same files is slower than fewer, and a group wider than the work's real
+  independence pays for every member while saving only on the independent ones. If phase 7 needs to
+  be shorter, that is a message to the architect about the decomposition — and before any of it,
+  check that the group went out in **one** message.
 - **Intake blocking questions stop the product phase, not the pipeline.** Present them to the human
   verbatim and wait — but only phase 2 onward actually waits, since research does not need the
   answers (see the overlap note above). This is the one place the pipeline blocks on a person, and
@@ -199,7 +220,8 @@ Rules for the sequence:
   what anyone examines. `/sdlc-review` runs the same sequence standalone:
   1. `sdlc-review-lead` **verify-fast** — build, type check, diff scope. Seconds. If the build fails,
      stop here; nobody reviews code that does not compile. This is the *only* thing the fan-out waits
-     on.
+     on. Where a parallel phase-7 join already ran it against this same tree, that run **was** this
+     step: carry its `verification.md` forward instead of repeating it.
   2. **In one message, all at once**: `sdlc-review-lead` **verify-slow** (suite, smoke, claim check)
      plus the four static lenses — `sdlc-code-reviewer`, `sdlc-review-security`,
      `sdlc-review-performance`, and `sdlc-architect` (compliance). The static lenses read source and
@@ -215,8 +237,14 @@ Rules for the sequence:
 - **Phase 8 has an inner fix loop.** A review failure does not immediately cost a cycle. Triage
   the findings, run `sdlc-implementer` in fix mode, then re-run the **same** reviewer to verify
   its own findings are closed — it may re-verify what it found, since it did not fix it. Loop at
-  most twice. If blockers survive two fix attempts, stop looping and let the cycle close; two
-  failed fixes mean the cause was never found, and protocol section 4 (Triage) sends it to `sdlc-debugger`.
+  most twice. **Re-run verify-fast when the fixers return, before the reviewer**, and verify-slow
+  before the gate — and when the reviewer being re-run is `sdlc-review-tests`, re-run verify-slow
+  **before that lens too**, since it compares suite results against the plan and has nothing to read
+  otherwise (protocol 9a rule 3). Fix-mode implementers are scoped the same way phase 7's are
+  (protocol 9b), and a static lens may not build, so without those runs the review gate signs
+  "build and suite green" over a tree nobody compiled since the fixes landed. If blockers survive
+  two fix attempts, stop looping and let the cycle close; two failed fixes mean the cause was never found, and
+  protocol section 4 (Triage) sends it to `sdlc-debugger`.
 - Never accept a reviewer's `passed` after an implementer changed code the reviewer has not
   re-read. Re-run the reviewer, or the sign-off refers to code that no longer exists.
 - Phases 8 and 9 both read the same build; run functional QA first, since a broken build
