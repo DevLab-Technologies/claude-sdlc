@@ -245,6 +245,12 @@ Every blocker/major fix ships a regression test that fails before it and passes 
 a default** so the pipeline never deadlocks. The addressee appends `## Answer` and flips status.
 Questions only a human can answer go to `00-intake/questions.md`.
 
+`blocking: true` means you stopped; `blocking: false` means you went on under your default. Say
+which — the Pipeline Floor shows a blocking question as a stopped desk waiting on its addressee,
+and a desk that stopped without saying so is drawn as one still working. Append `question_asked`
+when you write the file and `question_answered` when it is answered, both carrying the `seq`, so
+the floor can time the wait from the ask rather than from the file's mtime.
+
 ## 6. ADRs
 
 `docs/adr/NNNN-kebab-title.md` from the template, one decision each, for anything expensive to

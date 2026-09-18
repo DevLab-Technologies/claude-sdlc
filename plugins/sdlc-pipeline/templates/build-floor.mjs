@@ -47,7 +47,13 @@ const DESK_IDS = new Set([
 // Agent id -> gate. Source of truth is the Agent → Gate table in commands/sdlc.md.
 // Resolved by agent first because sdlc-qa-ui and sdlc-qa-functional can log under
 // the same phase directory while counting toward different gates.
-const AGENT_GATE = {
+//
+// Null-prototype, like AGENT_ALIASES and for the same reason: the key is an
+// agent id or a phase directory straight out of the log. A plain literal answers
+// `valueOf` or `constructor` with an inherited function, which is truthy, so it
+// walks past every `if (!gate)` guard and lands in gateStatus as a key no gate
+// rail can read — taking the real outcome with it.
+const AGENT_GATE = Object.assign(Object.create(null), {
   "sdlc-intake": "intake",
   "sdlc-researcher-findings": "research",
   "sdlc-researcher-prior-art": "research",
@@ -67,17 +73,17 @@ const AGENT_GATE = {
   "sdlc-review-tests": "review",
   "sdlc-qa-ui": "ui-qa",
   "sdlc-release-gate": "release",
-};
+});
 
 // Phase directory -> gate, the fallback when the agent id is unknown or
 // context-dependent (sdlc-qa-functional plans in phase 6 and executes in phase 9).
-const PHASE_GATE = {
+const PHASE_GATE = Object.assign(Object.create(null), {
   "00-intake": "intake", "01-research": "research", "02-product": "product",
   "03-design": "design", "03b-figma": "figma-design", "04-ux-audit": "ux-audit",
   "05-architecture": "architecture", "06-test-plan": "test-plan",
   "07-implementation": "implementation", "08-review": "review",
   "09-qa": "qa", "10-ui-qa": "ui-qa", "11-release": "release",
-};
+});
 
 // Which desks a gate is expected to occupy. This is the only place the floor can
 // learn what has NOT happened yet: the event log records what ran, never what is
@@ -126,7 +132,11 @@ const FLOATING_AGENTS = new Set(["sdlc-debugger", "sdlc-implementer"]);
 // pairing, tokens, the task board and the desks all see one id per agent.
 // Machinery is not a defect in the log and never will be, so it is reported as a
 // deliberate omission rather than as an unknown agent nobody can act on.
-const AGENT_ALIASES = {
+// Null-prototype: the id comes from the log, and a plain literal answers to
+// `constructor`, `toString` and `valueOf` with an inherited function, which was
+// then written back onto the event as its agent and carried into the desk
+// lookups, the roster keys and the state the floor renders.
+const AGENT_ALIASES = Object.assign(Object.create(null), {
   "sdlc-research-internal": "sdlc-researcher-findings",
   "sdlc-research-findings": "sdlc-researcher-findings",
   "sdlc-research-external": "sdlc-researcher-prior-art",
@@ -136,7 +146,7 @@ const AGENT_ALIASES = {
   "sdlc-reviewer-correctness": "sdlc-code-reviewer",
   "sdlc-ux-audit": "sdlc-ux-auditor",
   "sdlc-qa-func": "sdlc-qa-functional",
-};
+});
 
 // Machinery: it runs the pipeline rather than a phase of it. Omitted from the
 // floor by design, which is a different statement from "this agent is unknown".
@@ -198,6 +208,7 @@ const GAP_KINDS = {
   "desk-shared":       { nature: "irreducible", title: "desks showing merged logs" },
   "gate-attributed":   { nature: "irreducible", title: "time attributed to a gate by approximation" },
   "gate-skipped":      { nature: "irreducible", title: "gates skipped by this feature's track" },
+  "gate-unmapped":     { nature: "unresolved",  title: "gate outcomes that map to no gate" },
   "cycle-rail":        { nature: "irreducible", title: "what the gate rail covers" },
   "tokens-missing":    { nature: "irreducible", title: "runs with no token usage recorded" },
   "tokens-unmatched":  { nature: "unresolved",  title: "run_usage events that matched no run" },
@@ -206,6 +217,11 @@ const GAP_KINDS = {
   "task-unattributed": { nature: "unresolved",  title: "runs that named no task" },
   "task-unplaceable":  { nature: "unresolved",  title: "runs naming a task the board has no row for" },
   "state-unreadable":  { nature: "unresolved",  title: "state.json could not be read" },
+  "waiting-human":     { nature: "derived",     title: "questions read as answered" },
+  "waiting-agent":     { nature: "irreducible", title: "open questions that do not stop a desk" },
+  "waiting-addressee": { nature: "derived",     title: "questions whose addressee had to be read as a person" },
+  "waiting-pairing":   { nature: "unresolved",  title: "answers matched to a question by order alone" },
+  "bus-unreadable":    { nature: "unresolved",  title: "bus files that could not be read" },
   "other":             { nature: "unresolved",  title: "other" },
 };
 
@@ -505,9 +521,13 @@ function makeRun(start, complete, gaps) {
 //      cycle closed that one, and nothing in a closed cycle is still working;
 //   2. a gate outcome for the run's own phase and cycle was recorded after it
 //      started — the phase reached a verdict without it;
-//   3. the same agent started the same phase and cycle again afterwards — per
-//      protocol 3a that is what happens TO an interrupted run, and the re-run is
-//      the bracket that counts;
+//   3. the same unit of work — the same task id — was started again under that
+//      agent, phase and cycle. Per protocol 3a that is what happens TO an
+//      interrupted run, and the re-run is the bracket that counts. The named
+//      task is what makes it evidence: a whole parallel fan-out shares one
+//      agent, one phase and one cycle between its members (see pairRuns), so
+//      where no task is named a later start is just as likely to be a colleague
+//      still working alongside this one;
 //   4. /sdlc-resume ran after it started — reconciling the workspace is the act
 //      of settling everything left open before it, so a run the resume record
 //      covers is finished business whatever its own bracket says.
@@ -518,6 +538,9 @@ function makeRun(start, complete, gaps) {
 //
 // Anything no rule catches is treated as live, which is the only safe default:
 // calling a working agent dead would hide the thing the floor exists to show.
+// Live is not the same as working: buildWaiting runs next and demotes every live
+// run whose agent has an unanswered question to waiting, which is the difference
+// between a desk somebody has to come back to and a desk getting on with it.
 function classifyOpenRuns(runs, events, currentCycle, gaps) {
   const gateEvents = events.filter((e) => e.event === "gate_passed" || e.event === "gate_failed");
   // Recovery runs, in time order. The first one after an open start settles it.
@@ -525,8 +548,13 @@ function classifyOpenRuns(runs, events, currentCycle, gaps) {
   // Every phase_start, by the key a re-run would reuse — with the task it named,
   // because that key is also what a whole parallel fan-out shares. Three
   // implementers running concurrently write one agent, one phase and one cycle
-  // between them (see pairRuns), so a later start under the same key is a re-run
-  // only when it is the same unit of work.
+  // between them (see pairRuns), and none of them need name a task, so a later
+  // start is a re-run only where both brackets name the SAME one. Matching two
+  // absent tasks to each other read a live fan-out as each member re-running the
+  // last — every desk but one stalled while all of them were working. Where
+  // neither names a task the log genuinely cannot tell the two apart: rules 1
+  // and 2 still catch most of those, and what is left is disclosed as the
+  // coin-toss it is rather than guessed at.
   const startsByKey = new Map();
   for (const e of events) {
     if (e.event !== "phase_start") continue;
@@ -535,7 +563,6 @@ function classifyOpenRuns(runs, events, currentCycle, gaps) {
     startsByKey.get(k).push({ t: e._t, task: e.task || null });
   }
   const stalled = [];
-  let live = 0;
   for (const r of runs) {
     if (!r.running) continue;
     const cycle = r.cycle ?? 1;
@@ -547,9 +574,9 @@ function classifyOpenRuns(runs, events, currentCycle, gaps) {
       if (g) why = `the ${r.phase} gate was recorded ${g.event === "gate_failed" ? "failed" : "passed"} while it was still open`;
     }
     if (!why) {
-      const again = (startsByKey.get(`${r.agent} ${r.phase} ${cycle}`) || [])
-        .some((st) => st.t > r.start && st.task === (r.task || null));
-      if (again) why = `the same ${r.task ? r.task + " " : ""}run started ${r.phase} again in this cycle, which is how an interrupted run is re-run`;
+      const again = r.task && (startsByKey.get(`${r.agent} ${r.phase} ${cycle}`) || [])
+        .some((st) => st.t > r.start && st.task === r.task);
+      if (again) why = `${r.task} was started again in ${r.phase} in this cycle, which is how an interrupted run is re-run`;
     }
     if (!why) {
       const rec = recoveries.find((e) => e._t > r.start);
@@ -566,13 +593,9 @@ function classifyOpenRuns(runs, events, currentCycle, gaps) {
       r.end = r.start;
       stalled.push(r);
     }
-    else live++;
   }
   for (const r of stalled) {
     gaps.add("open-run-settled", `${r.agent} in ${r.phase} (cycle ${r.cycle ?? 1}): phase_start with no run_complete, and ${r.stalledWhy} — shown as stalled, not working. Its time is not counted.`);
-  }
-  if (live) {
-    gaps.add("open-run-live", `${live} run(s) have a phase_start with no run_complete and nothing in the log that closed them — shown as working. From the log alone, running now and interrupted a moment ago look identical.`);
   }
   return stalled.length;
 }
@@ -671,7 +694,10 @@ function buildState(root, slug) {
       gaps: gaps.lines(),
       gapGroups: gaps.groups(),
       steps: [], desks: {}, plan: [], upNext: [], roster: [], tasks: [], nowRunning: [],
-      gateStatus: {}, skippedGates: [], gates: GATES, stalled: 0,
+      gateStatus: {}, skippedGates: [], gates: GATES, stalled: 0, blocked: 0, blockedDesks: 0,
+      waiting: { waiting: false, blocking: false, onHuman: false, humanCount: 0,
+        blockingCount: 0, count: 0,
+        status: null, blockedOn: null, openQuestions: null, items: [], byAgent: {} },
       tokens: { total: 0, reportedRuns: 0, totalRuns: 0 } };
   }
 
@@ -681,6 +707,13 @@ function buildState(root, slug) {
   // open runs are live and which the pipeline left behind.
   const cycles = Math.max(1, ...events.map((e) => e.cycle ?? 1));
   const stalledCount = classifyOpenRuns(runs, events, cycles, gaps);
+  // Before anything is drawn: which of the runs still open are open because an
+  // agent asked a question and stopped. A blocked run is not a working one, and
+  // every tally below — the header, the desks, the roster, the elapsed clocks —
+  // reads that flag rather than deciding for itself.
+  const waiting = buildWaiting(featureDir, events, gaps);
+  const blockedCount = markBlockedRuns(runs, waiting);
+  discloseOpenRuns(runs, gaps);
   attachTokens(runs, events, gaps);
   const clusters = groupRuns(runs, now);
   const signoffs = loadSignoffs(runsDir);
@@ -780,6 +813,11 @@ function buildState(root, slug) {
     const startedAt = Math.min(...cluster.map((r) => r.start));
     const endedAtRaw = cluster.every((r) => r.end != null) ? Math.max(...cluster.map((r) => r.end)) : null;
     const live = cluster.some((r) => r.running && !r.stalled);
+    // Open, and open for a reason somebody has to act on. A step where every
+    // live run is waiting on an answer must not wear the working look — that is
+    // exactly the desk this floor was drawing as busy while nothing moved.
+    const working = cluster.some((r) => r.running && !r.stalled && !r.blocked);
+    const blockedRuns = cluster.filter((r) => r.blocked);
 
     const desks = [];
     const real = {};
@@ -812,7 +850,8 @@ function buildState(root, slug) {
       && severityOf(e, issueIdsOf(e)[0] || null, issueMeta) === "blocker");
 
     let state;
-    if (live) state = "working";
+    if (working) state = "working";
+    else if (live && blockedRuns.length) state = "blocked";
     else if (gateEvent?.event === "gate_failed" || blocker) state = "bad";
     else state = "done";
 
@@ -874,11 +913,18 @@ function buildState(root, slug) {
       gate: gateEvent ? gate : null,
       gateState: gateEvent ? (gateEvent.event === "gate_failed" ? "bad" : "done") : null,
       ticker, signoff, live,
+      // Who the step is waiting on, in the words the caption and the desk cards
+      // both use. Empty on every step that is not waiting.
+      blockedOn: blockedRuns.length ? blockedRuns[0].blockedOn : null,
+      blockedWhy: blockedRuns.length ? blockedRuns[0].blockedWhy : null,
+      blockedSince: blockedRuns.length ? blockedRuns[0].blockedSince : null,
       // Snapshot past the gate event this step carries, so a step that failed a
       // gate shows the blocker it opened rather than the count from a second earlier.
       issuesAt: tallyAt(events, windowEnd, issueMeta),
       startedAt, endedAt: endedAtRaw,
-      caption: live
+      caption: (live && blockedRuns.length && !working)
+        ? `${names.join(", ")} — waiting on ${blockedRuns[0].blockedOn} in ${cluster[0].phase}: ${blockedRuns[0].blockedWhy}`
+        : live
         ? `${names.join(", ")} — working now in ${cluster[0].phase}.`
         : (cluster.length > 1
           ? `${cluster.length} agents ran concurrently in ${cluster[0].phase}.`
@@ -922,7 +968,9 @@ function buildState(root, slug) {
   // Stalled runs are not running, whatever their missing run_complete implies.
   // Counting them here is what kept a header reading "pipeline running" on a
   // feature whose last real activity was days earlier.
-  const anyRunning = runs.some((r) => isDrawn(r) && r.running && !r.stalled);
+  // Waiting is not running. A floor that counts a blocked desk as running keeps
+  // the header green and the clock moving over a pipeline that stopped.
+  const anyRunning = runs.some((r) => isDrawn(r) && r.running && !r.stalled && !r.blocked);
   if (cycles > 2) {
     gaps.add("cycle-rail", `this feature reached cycle ${cycles}; the floor's cycle badge shows the real number, but the gate rail only reflects the latest cycle's outcomes.`);
   }
@@ -956,23 +1004,43 @@ function buildState(root, slug) {
   // Only the current cycle's events overrule: opening cycle n+1 resets gates to
   // pending in state.json, and an outcome from a closed cycle is not a claim
   // about this one.
+  // A gate outcome whose phase and agent are both off the map lights no pill and
+  // sets no status. Passing over it in silence is the one thing this floor must
+  // not do: the record would show a gate that never reached a verdict, which is
+  // a different claim from the one the log actually makes. Collected here and
+  // named once per phase — this loop sees every gate event, including the ones
+  // the step pass above skipped for the same reason.
+  const unmapped = new Map();
   const gateStatus = readStateGates(featureDir);
   for (const g of gateEvents) {
     const gate = PHASE_GATE[g.phase] || AGENT_GATE[g.agent];
-    if (!gate) continue;
+    if (!gate) {
+      const k = `${g.phase}\u0000${g.agent}`;
+      const seen = unmapped.get(k) || { phase: g.phase, agent: g.agent, n: 0 };
+      seen.n++;
+      unmapped.set(k, seen);
+      continue;
+    }
     if ((g.cycle ?? 1) !== cycles) {
       if (!gateStatus[gate]) gateStatus[gate] = g.event === "gate_failed" ? "failed" : "passed";
       continue;
     }
     gateStatus[gate] = g.event === "gate_failed" ? "failed" : "passed";
   }
+  for (const u of unmapped.values()) {
+    gaps.add("gate-unmapped", `${u.n} gate outcome(s) recorded by '${u.agent}' under phase '${u.phase}', which maps to no gate on this floor — no pill is lit and no gate status is set, so that verdict is missing from the rail entirely. Add the phase to PHASE_GATE, or the agent to AGENT_GATE.`);
+  }
   skipped.forEach((g) => { gateStatus[g] = "skipped"; });
 
   const tasks = loadTasks(featureDir, gaps);
   attachTaskRuns(tasks, runs, gaps);
-  const roster = buildRoster(runs, gateStatus, now);
-  const { plan, upNext } = buildPlan(gateStatus, runs, skipped, now);
+  const roster = buildRoster(runs, gateStatus, now, waiting);
+  const { plan, upNext } = buildPlan(gateStatus, runs, skipped, waiting);
   const nowRunning = buildNow(runs, now);
+  const nowBlocked = buildBlockedNow(runs, now);
+  // Desks, not open runs: the commonest stuck pipeline is an agent that asked,
+  // finished its run and stopped, which leaves nothing open to count.
+  const blockedDesks = roster.filter((r) => r.status === "blocked").length;
 
   // Both halves of the coverage ratio count completed runs, and the total sums
   // the same set. A run_usage written for a run whose run_complete has not landed
@@ -1002,6 +1070,9 @@ function buildState(root, slug) {
     issues,
     tokens,
     stalled: stalledCount,
+    blocked: blockedCount,
+    blockedDesks,
+    waiting,
     gates: GATES,
     skippedGates: skipped,
     gateStatus,
@@ -1010,6 +1081,7 @@ function buildState(root, slug) {
     roster,
     tasks,
     nowRunning,
+    nowBlocked,
     steps,
     // Both shapes of the same record: the flat list every existing reader
     // expects, and the same lines filed by kind and nature so a report can lead
@@ -1313,6 +1385,350 @@ function attachTaskRuns(tasks, runs, gaps) {
 }
 
 /* ============================================================
+   WAITING — the questions nobody has answered yet
+   ============================================================ */
+
+// The one thing the floor was getting plainly wrong about a paused pipeline: an
+// agent that stopped to ask a question looks, in the event log, exactly like an
+// agent thinking hard. Both are a phase_start with no run_complete. So the floor
+// drew a lit desk and an advancing clock over a pipeline that had been waiting on
+// a person since yesterday — the single state that needs a human, rendered as the
+// one state that needs nothing from them.
+//
+// The run bracket cannot say it, but four records can, and none of them is an
+// event pair:
+//
+//   1. `bus/<NNNN>-<from>-to-<to>.md` whose frontmatter still says `status: open`
+//      — the directed-question protocol, section 5;
+//   2. a `question_asked` event with no `question_answered` after it;
+//   3. `00-intake/questions.md` with a non-empty `## Blocking` section and no
+//      `answers.md` beside it — intake's own documented stop condition;
+//   4. `state.json`'s `status: awaiting_human | blocked`, its `blocked_on` and
+//      its `open_questions` — the pipeline's own claim that it stopped.
+//
+// Any one of them is enough to say the pipeline is waiting. Together they say
+// who is waiting and on whom. None of them is inferred from silence: a desk that
+// has simply gone quiet is not called blocked, because a quiet desk and a
+// thinking desk are the same desk, and only these four records tell them apart.
+
+// Who counts as a person. Everything else is checked against the roster, because
+// the difference that matters to a reader is "somebody has to go and answer
+// this" versus "another agent owes it, and the pipeline will get there itself".
+const HUMAN_ADDRESSEES = /^(human|humans|user|you|person|people|requester|owner|stakeholder|maintainer|operator|caller|pm)$/i;
+
+function isHumanAddressee(to, gaps, where) {
+  const id = String(to || "").trim();
+  // A question with no addressee at all is the human's: no agent was named to
+  // pick it up, so nothing in the pipeline is going to.
+  if (!id) return true;
+  if (HUMAN_ADDRESSEES.test(id)) return true;
+  const norm = normaliseAgent(id).agent;
+  if (DESK_IDS.has(norm) || AGENT_GATE[norm] || MACHINERY_AGENTS.has(norm)) return false;
+  gaps.add("waiting-addressee", `${where}: addressed to '${id}', which is not an agent this pipeline knows — read as a person, so the floor says the wait is on you.`);
+  return true;
+}
+
+// Frontmatter as a flat map. Every reader here wants two or three scalar keys
+// out of a block the protocol writes by hand, so a shared shallow parse is
+// closer to the files than another per-field regex in each caller.
+function parseFrontmatter(text) {
+  const m = String(text || "").match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return null;
+  const out = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (kv) out[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, "");
+  }
+  return out;
+}
+
+// The question itself, short enough for a desk card. A reader deciding whether
+// to go and answer something needs the ask, not the whole memo.
+function firstLine(text, limit) {
+  const line = String(text || "").split(/\r?\n/)
+    .map((l) => l.trim().replace(/^[-*>]\s*/, "").replace(/^#{1,6}\s*/, ""))
+    .find(Boolean);
+  if (!line) return "";
+  const cap = limit || 140;
+  return line.length > cap ? line.slice(0, cap - 1) + "…" : line;
+}
+
+function mtimeOf(p) {
+  try { return fs.statSync(p).mtimeMs; } catch { return null; }
+}
+
+// Same id on both sides of a question wherever a seq exists, so the bus file and
+// the event that announced it are one wait rather than two.
+function questionId(e) {
+  if (e.id) return String(e.id);
+  if (e.question_id) return String(e.question_id);
+  if (e.seq != null) return `bus-${e.seq}`;
+  const text = [e.summary || "", e.question || "", ...(Array.isArray(e.artifacts) ? e.artifacts : [])].join(" ");
+  const m = text.match(/bus\/(\d+)-/);
+  return m ? `bus-${Number(m[1])}` : null;
+}
+
+function loadBusWaits(featureDir, gaps) {
+  const dir = path.join(featureDir, "bus");
+  const items = [];
+  if (!fs.existsSync(dir)) return items;
+  for (const name of fs.readdirSync(dir).sort()) {
+    if (!name.endsWith(".md")) continue;
+    const full = path.join(dir, name);
+    let text;
+    try { text = fs.readFileSync(full, "utf8"); } catch {
+      gaps.add("bus-unreadable", `bus/${name} could not be read — if it holds an open question, the floor cannot show that anybody is waiting on it.`);
+      continue;
+    }
+    const fm = parseFrontmatter(text) || {};
+    const byName = name.match(/^(\d+)-(.+?)-to-(.+)\.md$/);
+    const status = String(fm.status || "open").toLowerCase();
+    if (status === "answered" || status === "closed" || status === "resolved") continue;
+    const seq = fm.seq != null ? Number(fm.seq) : (byName ? Number(byName[1]) : null);
+    const from = normaliseAgent(fm.from || (byName ? byName[2] : "")).agent || null;
+    const to = fm.to || (byName ? byName[3] : "") || null;
+    const question = (text.match(/##\s*Question\s*\r?\n([\s\S]*?)(?=\n##\s|\s*$)/i) || [])[1] || "";
+    items.push({
+      kind: "bus",
+      id: seq != null ? `bus-${seq}` : `bus-${name}`,
+      from, to,
+      human: isHumanAddressee(to, gaps, `bus/${name}`),
+      // Every bus question carries a default so the pipeline never deadlocks
+      // (protocol section 5), so an explicitly non-blocking one does NOT stop
+      // the desk that asked it — it is listed as open and the agent carries on
+      // under its default. Anything else is read as blocking: a question whose
+      // frontmatter forgot to say is far more likely to be a real stop than a
+      // desk this floor should quietly paint as working.
+      blocking: !/^(false|no|non-blocking|nonblocking)$/i.test(String(fm.blocking || "")),
+      text: firstLine(question) || `open question in bus/${name}`,
+      source: `bus/${name}`,
+      since: mtimeOf(full),
+    });
+  }
+  return items;
+}
+
+// question_asked with nothing closing it. The protocol names both events but
+// fixes no id field on either, so the pairing is: an explicit id or seq first,
+// then an answer that names one of the two parties, and only then order —
+// which is disclosed, because order is a guess wherever two are open at once.
+function loadEventWaits(events, gaps) {
+  const open = [];
+  let byOrder = 0;
+  for (const e of events) {
+    if (e.event === "question_asked") {
+      const to = e.to || e.addressee || null;
+      open.push({
+        kind: "question",
+        id: questionId(e),
+        from: e.agent || null,
+        to,
+        human: isHumanAddressee(to, gaps, `question_asked at ${new Date(e._t).toISOString()}`),
+        blocking: e.blocking !== false,
+        text: firstLine(e.question || e.summary || "") || "a question with no text recorded",
+        source: "history/events.jsonl",
+        since: e._t,
+      });
+    } else if (e.event === "question_answered") {
+      if (!open.length) continue;
+      const id = questionId(e);
+      let i = id ? open.findIndex((q) => q.id === id) : -1;
+      if (i === -1) {
+        i = open.findIndex((q) => (e.agent && (q.from === e.agent || q.to === e.agent))
+          || (e.to && (q.from === e.to || q.to === e.to)));
+      }
+      if (i === -1) { i = 0; byOrder++; }
+      open.splice(i, 1);
+    }
+  }
+  if (byOrder) {
+    gaps.add("waiting-pairing", `${byOrder} question_answered event(s) named neither an id nor a party, so each closed the oldest question still open. Where two were open at once, which one it answered is a guess.`);
+  }
+  return open;
+}
+
+// Intake's stop condition, which is a pair of files rather than an event: it
+// writes the blocking questions and stops, and the human answers by putting
+// 00-intake/answers.md beside them.
+function loadIntakeWait(featureDir, gaps) {
+  const qPath = path.join(featureDir, "00-intake", "questions.md");
+  if (!fs.existsSync(qPath)) return null;
+  let text = "";
+  try { text = fs.readFileSync(qPath, "utf8"); } catch { return null; }
+  const block = (text.match(/##\s*Blocking\s*\r?\n([\s\S]*?)(?=\n##\s|\s*$)/i) || [])[1] || "";
+  const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return null;
+  // Two things settle these, and neither is a per-question record. answers.md is
+  // the human coming back; a passed intake gate is intake's own criterion —
+  // it passes only when no blocking question is unanswered (agents/sdlc-intake.md).
+  // Without the second one, a human who answered in the session and never had
+  // the answers written down would leave this desk waiting for the rest of the
+  // feature.
+  const answered = fs.existsSync(path.join(featureDir, "00-intake", "answers.md"));
+  const intakeGate = readStateGates(featureDir).intake;
+  if (answered || intakeGate === "passed" || intakeGate === "skipped") {
+    gaps.add("waiting-human", `00-intake/questions.md lists blocking questions and ${answered ? "00-intake/answers.md exists" : `state.json records the intake gate '${intakeGate}'`} — the floor reads that as all of them settled. Nothing maps an answer to a question, so it cannot check that.`);
+    return null;
+  }
+  const count = lines.filter((l) => /^(#{3,}\s|[-*]\s|\d+[.)]\s)/.test(l)).length || 1;
+  return {
+    kind: "intake",
+    id: "intake-questions",
+    from: "sdlc-intake",
+    to: "human",
+    human: true,
+    blocking: true,
+    count,
+    text: firstLine(lines.filter((l) => /^(#{3,}\s|[-*]\s|\d+[.)]\s)/.test(l))[0] || lines[0])
+      || `${count} blocking question(s) in 00-intake/questions.md`,
+    source: "00-intake/questions.md",
+    since: mtimeOf(qPath),
+  };
+}
+
+// The pipeline's own claim about itself. It is the only record that survives a
+// session dying mid-phase, and the only one that can say "blocked" for a reason
+// that was never a question.
+function readStateWait(featureDir, gaps) {
+  const statePath = path.join(featureDir, "state.json");
+  if (!fs.existsSync(statePath)) return {};
+  try {
+    const st = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    return {
+      status: typeof st.status === "string" ? st.status : null,
+      blockedOn: st.blocked_on || null,
+      openQuestions: typeof st.open_questions === "number" ? st.open_questions : null,
+    };
+  } catch {
+    gaps.add("state-unreadable", `state.json could not be parsed — the pipeline's own record of whether it is waiting on somebody could not be read.`);
+    return {};
+  }
+}
+
+function buildWaiting(featureDir, events, gaps) {
+  const items = [];
+  const seen = new Set();
+  // The bus file and the event that announced it are the same question. The file
+  // is kept because it carries the current status, which the event never had —
+  // but the event carries the real moment of asking, where the file has only an
+  // mtime that any later edit resets. So each keeps the half it actually knows.
+  const fromEvents = loadEventWaits(events, gaps);
+  const askedAt = new Map(fromEvents.filter((it) => it.id).map((it) => [it.id, it.since]));
+  for (const it of loadBusWaits(featureDir, gaps).concat(fromEvents)) {
+    if (it.id && seen.has(it.id)) continue;
+    if (it.id) seen.add(it.id);
+    if (it.kind === "bus" && askedAt.has(it.id)) it.since = askedAt.get(it.id);
+    items.push(it);
+  }
+  const intake = loadIntakeWait(featureDir, gaps);
+  if (intake) items.push(intake);
+
+  const st = readStateWait(featureDir, gaps);
+  const stateSaysWaiting = st.status === "awaiting_human" || st.status === "blocked"
+    || (st.openQuestions || 0) > 0;
+  if (stateSaysWaiting && !items.length) {
+    // state.json says it stopped and no question survives to say what on. That
+    // is still the fact a reader needs; it just comes with less detail.
+    const on = st.status === "blocked" && st.blockedOn ? String(st.blockedOn) : "human";
+    items.push({
+      kind: "state",
+      id: "state",
+      from: null,
+      to: on,
+      human: on === "human" || isHumanAddressee(on, gaps, "state.json blocked_on"),
+      blocking: true,
+      text: st.blockedOn ? `blocked on ${st.blockedOn}`
+        : st.openQuestions ? `${st.openQuestions} open question(s) recorded in state.json`
+        : `state.json records status: ${st.status}`,
+      source: "state.json",
+      since: mtimeOf(path.join(featureDir, "state.json")),
+    });
+  }
+
+  // Blocking first, and a person's questions before an agent's: the card is read
+  // top-down, and the top of it should be the thing that has actually stopped.
+  const rank = (it) => (it.blocking ? 0 : 2) + (it.blocking && it.human ? 0 : 1);
+  items.sort((a, b) => (rank(a) - rank(b)) || ((a.since || 0) - (b.since || 0)));
+
+  const byAgent = {};
+  for (const it of items) {
+    if (!it.from) continue;
+    if (!byAgent[it.from]) byAgent[it.from] = [];
+    byAgent[it.from].push(it);
+  }
+
+  const blocking = items.filter((it) => it.blocking);
+  const onHuman = blocking.filter((it) => it.human);
+  // The waits themselves are shown on the floor, so they are not gaps. What
+  // belongs here is only what the floor had to decide for itself.
+  for (const it of items) {
+    if (it.blocking) continue;
+    gaps.add("waiting-agent", `${it.source}: ${it.from || "an agent"} has an open question for ${it.human ? "a person" : it.to} — "${it.text}" — marked non-blocking, so its desk is not shown as waiting. Whether it really proceeded under its default is not something the log records.`);
+  }
+
+  return {
+    // Anything open at all: the card lists non-blocking questions too, because
+    // "nobody has answered this" is worth seeing even where work continued.
+    waiting: items.length > 0,
+    // Somebody has to act before the pipeline moves.
+    blocking: blocking.length > 0 || st.status === "awaiting_human",
+    onHuman: onHuman.length > 0 || st.status === "awaiting_human",
+    humanCount: onHuman.length,
+    blockingCount: blocking.length,
+    count: items.length,
+    status: st.status || null,
+    blockedOn: st.blockedOn || null,
+    openQuestions: st.openQuestions,
+    items,
+    byAgent,
+  };
+}
+
+// What is left open once the waits are known: runs shown as working, and runs
+// shown as waiting. Written here rather than in classifyOpenRuns because until
+// the questions are read, the floor cannot say which of the two an open run is —
+// and "shown as working" was the wrong disclosure for half of them.
+function discloseOpenRuns(runs, gaps) {
+  const open = runs.filter((r) => r.running && !r.stalled);
+  const working = open.filter((r) => !r.blocked).length;
+  const blocked = open.length - working;
+  if (working) {
+    gaps.add("open-run-live", `${working} run(s) have a phase_start with no run_complete, nothing in the log that closed them, and no unanswered question behind them — shown as working. From the log alone, running now and interrupted a moment ago look identical.`);
+  }
+  if (blocked) {
+    gaps.add("open-run-live", `${blocked} run(s) are open with an unanswered question from the same agent — shown as waiting rather than working. The log cannot prove the agent is still sitting on that question; the question being unanswered is what it can prove.`);
+  }
+}
+
+// A live run whose own agent has an unanswered question is not working — it is
+// waiting, and the difference is the whole point of this. Time spent waiting is
+// never added to the agent's worked time: the desk's clock would otherwise bill
+// a person's weekend to the pipeline.
+function markBlockedRuns(runs, waiting) {
+  let n = 0;
+  for (const r of runs) {
+    if (!r.running || r.stalled) continue;
+    const mine = (waiting.byAgent[r.agent] || [])
+      // Only a blocking question stops a desk. A non-blocking one has a default
+      // the agent is entitled to proceed under, and calling that desk stopped
+      // would be the same false statement in the other direction.
+      .filter((it) => it.blocking)
+      // Asked before this run even started, and it belongs to an earlier run of
+      // the same desk; this one is not waiting on it.
+      .filter((it) => it.since == null || it.since >= r.start);
+    if (!mine.length) continue;
+    const it = mine[mine.length - 1];
+    r.blocked = true;
+    r.blockedOn = it.human ? "you" : String(it.to || "another desk").replace(/^sdlc-/, "");
+    r.blockedWhy = it.text;
+    r.blockedSource = it.source;
+    r.blockedSince = it.since || r.start;
+    n++;
+  }
+  return n;
+}
+
+/* ============================================================
    ROSTER, PLAN, NOW — done / doing / remaining, per agent
    ============================================================ */
 
@@ -1320,14 +1736,36 @@ function attachTaskRuns(tasks, runs, gaps) {
 // this instant, and whether it is still expected to run. A desk with no runs is
 // only "queued" if its gate has not been passed or skipped — otherwise the
 // pipeline is simply never going to reach it.
-function buildRoster(runs, gateStatus, now) {
+function buildRoster(runs, gateStatus, now, waiting) {
   const rows = [];
+  const waits = (waiting && waiting.byAgent) || {};
   for (const deskId of DESK_IDS) {
     const mine = runs.filter((r) => r._desk === deskId);
-    const running = mine.find((r) => r.running && !r.stalled) || null;
+    const running = mine.find((r) => r.running && !r.stalled && !r.blocked) || null;
+    const blockedRun = mine.find((r) => r.blocked) || null;
     const stalledRuns = mine.filter((r) => r.stalled);
+    // A question outlives the run that asked it: the agent writes the bus file,
+    // finishes its run, and the pipeline sits there with the desk reading
+    // "done". So a desk is blocked either because a run of its own is waiting,
+    // or because its agent has an unanswered question at all. The implementer
+    // desks are excluded from the second case on purpose — A, B and C share one
+    // agent id, so a question nobody's open run claimed would light all three
+    // when only one of them asked it.
+    const baseAgent = deskId.replace(/-[abc]$/, "");
+    const agentWaits = (waits[baseAgent] || []).filter((it) => it.blocking);
+    const deskWaits = (baseAgent === "sdlc-implementer" && !blockedRun) ? [] : agentWaits;
+    const blockedWait = blockedRun
+      ? { text: blockedRun.blockedWhy, to: blockedRun.blockedOn, since: blockedRun.blockedSince,
+          source: blockedRun.blockedSource }
+      : (deskWaits.length
+        ? { text: deskWaits[deskWaits.length - 1].text,
+            to: deskWaits[deskWaits.length - 1].human ? "you"
+              : String(deskWaits[deskWaits.length - 1].to || "another desk").replace(/^sdlc-/, ""),
+            since: deskWaits[deskWaits.length - 1].since,
+            source: deskWaits[deskWaits.length - 1].source }
+        : null);
     const done = mine.filter((r) => !r.running);
-    const recent = running || (done.length ? done[done.length - 1] : null);
+    const recent = running || blockedRun || (done.length ? done[done.length - 1] : null);
     // sdlc-qa-functional has no fixed gate — it plans in phase 6 and executes in
     // phase 9 — so fall back to the phase its own last run logged under.
     const gate = AGENT_GATE[deskId] || AGENT_GATE[deskId.replace(/-[abc]$/, "")]
@@ -1335,7 +1773,11 @@ function buildRoster(runs, gateStatus, now) {
     const tokenRuns = done.filter((r) => typeof r.tokens === "number");
     const last = done.length ? done[done.length - 1] : null;
     let status;
-    if (running) status = "working";
+    // Blocked outranks everything, including a second run of the same desk that
+    // is genuinely working: the question is the thing a reader has to act on,
+    // and nothing else on the row will prompt them to.
+    if (blockedWait) status = "blocked";
+    else if (running) status = "working";
     // A desk with an unclosed run ranks above its finished ones: something it
     // started was never accounted for, and that is the fact worth surfacing.
     else if (stalledRuns.length) status = "stalled";
@@ -1346,17 +1788,26 @@ function buildRoster(runs, gateStatus, now) {
     rows.push({
       desk: deskId, gate, status,
       runs: mine.length,
+      // What it is waiting on and since when, so the row can say so without the
+      // reader opening anything.
+      waitingOn: blockedWait ? blockedWait.to : null,
+      blockedWhy: blockedWait ? blockedWait.text : null,
+      blockedSince: blockedWait ? blockedWait.since : null,
+      blockedSource: blockedWait ? blockedWait.source : null,
       stalledRuns: stalledRuns.length,
       stalledWhy: stalledRuns.length ? stalledRuns[stalledRuns.length - 1].stalledWhy : null,
       // Clamped: a phase_start timestamped slightly ahead of this machine's clock
       // would otherwise render as negative elapsed time, which reads as a bug in
       // the floor rather than as the clock skew it is.
+      // A blocked run's elapsed time is deliberately absent from this: it is a
+      // person's turnaround, not the agent's work, and adding it would bill a
+      // weekend of waiting to the pipeline's agent time.
       totalMs: done.reduce((a, r) => a + (r.durationMs || 0), 0) + (running ? Math.max(0, now - running.start) : 0),
       liveSince: running ? running.start : null,
-      task: running ? running.task : (last ? last.task : null),
-      phase: running ? running.phase : (last ? last.phase : null),
-      cycle: running ? running.cycle : (last ? last.cycle : null),
-      model: running ? running.model : (last ? last.model : null),
+      task: (running || blockedRun) ? (running || blockedRun).task : (last ? last.task : null),
+      phase: (running || blockedRun) ? (running || blockedRun).phase : (last ? last.phase : null),
+      cycle: (running || blockedRun) ? (running || blockedRun).cycle : (last ? last.cycle : null),
+      model: (running || blockedRun) ? (running || blockedRun).model : (last ? last.model : null),
       tokens: tokenRuns.length ? tokenRuns.reduce((a, r) => a + r.tokens, 0) : null,
       tokensMissing: done.length - tokenRuns.length,
       lastSummary: last ? last.summary : "",
@@ -1368,9 +1819,22 @@ function buildRoster(runs, gateStatus, now) {
 // The gate rail as a sequence with a position in it: what is finished, what is
 // being worked, and — the part no event can tell you — what is still to come and
 // who will do it.
-function buildPlan(gateStatus, runs, skipped, now) {
-  const runningGates = new Set(runs.filter((r) => r.running && !r.stalled)
+function buildPlan(gateStatus, runs, skipped, waiting) {
+  const runningGates = new Set(runs.filter((r) => r.running && !r.stalled && !r.blocked)
     .map((r) => AGENT_GATE[r.agent] || PHASE_GATE[r.phase]).filter(Boolean));
+  // A gate with nothing running but a blocked run open is not in progress and is
+  // not pending either — it is stopped, waiting on an answer. So is a gate whose
+  // agent asked a blocking question and then finished its run, which is how
+  // intake stops: the run closes cleanly and the gate stays shut until somebody
+  // answers. "Pending" reads as "its turn has not come yet", which is the
+  // opposite of what has happened.
+  const blockedGates = new Set(runs.filter((r) => r.blocked)
+    .map((r) => AGENT_GATE[r.agent] || PHASE_GATE[r.phase]).filter(Boolean));
+  for (const it of ((waiting && waiting.items) || [])) {
+    if (!it.blocking || !it.from) continue;
+    const g = AGENT_GATE[it.from];
+    if (g) blockedGates.add(g);
+  }
   const rows = GATES.map((g) => {
     const mine = runs.filter((r) => (AGENT_GATE[r.agent] || PHASE_GATE[r.phase]) === g);
     const doneRuns = mine.filter((r) => !r.running);
@@ -1378,6 +1842,7 @@ function buildPlan(gateStatus, runs, skipped, now) {
     let status = gateStatus[g] || "pending";
     if (skipped.indexOf(g) > -1) status = "skipped";
     else if (runningGates.has(g)) status = "working";
+    else if (blockedGates.has(g) && status !== "passed" && status !== "failed") status = "blocked";
     return {
       gate: g, status,
       agents: GATE_AGENTS[g] || [],
@@ -1393,7 +1858,11 @@ function buildPlan(gateStatus, runs, skipped, now) {
   const firstUnfinished = rows.findIndex((r) => r.status !== "passed" && r.status !== "skipped");
   const upNext = rows
     .slice(firstUnfinished === -1 ? rows.length : firstUnfinished)
-    .filter((r) => r.status !== "skipped" && r.status !== "working")
+    // Nothing already settled, nothing in flight, and nothing stopped on a
+    // question — a gate that passed earlier is not "up next" just because a gate
+    // before it is still open.
+    .filter((r) => r.status !== "skipped" && r.status !== "passed"
+      && r.status !== "working" && r.status !== "blocked")
     .map((r) => ({ gate: r.gate, agents: r.agents }));
   return { plan: rows, upNext };
 }
@@ -1402,11 +1871,26 @@ function buildPlan(gateStatus, runs, skipped, now) {
 // unpaired phase_starts, which is also why the floor cannot tell "running" from
 // "interrupted" — both look exactly like this in the log.
 function buildNow(runs, now) {
-  return runs.filter((r) => isDrawn(r) && r.running && !r.stalled).map((r) => ({
+  return runs.filter((r) => isDrawn(r) && r.running && !r.stalled && !r.blocked).map((r) => ({
     agent: r.agent, desk: r._desk || null, phase: r.phase, cycle: r.cycle,
     gate: AGENT_GATE[r.agent] || PHASE_GATE[r.phase] || null,
     task: r.task, model: r.model,
     startedAt: r.start, elapsedMs: Math.max(0, now - r.start),
+  }));
+}
+
+// The other half of "what is happening now": the runs that are open and going
+// nowhere until somebody answers. Same shape as buildNow, with the wait on it,
+// so the panel can render the two lists side by side.
+function buildBlockedNow(runs, now) {
+  return runs.filter((r) => isDrawn(r) && r.blocked).map((r) => ({
+    agent: r.agent, desk: r._desk || null, phase: r.phase, cycle: r.cycle,
+    gate: AGENT_GATE[r.agent] || PHASE_GATE[r.phase] || null,
+    task: r.task, model: r.model,
+    on: r.blockedOn, why: r.blockedWhy, source: r.blockedSource,
+    startedAt: r.start,
+    since: r.blockedSince || r.start,
+    waitingMs: Math.max(0, now - (r.blockedSince || r.start)),
   }));
 }
 
@@ -1476,6 +1960,13 @@ function serve(root, slug, port) {
       // state.json. Leaving them out of the fingerprint is what would make the
       // page sit on a stale task list while claiming to be live.
       plan: s.plan, tasks: s.tasks, tokens: s.tokens, stalled: s.stalled,
+      // A question being asked or answered moves nothing else in here: no run
+      // starts, no run completes, no gate flips. Leaving the waits out is what
+      // would leave the page showing a working desk for as long as the answer
+      // took to arrive — the exact failure this is here to prevent.
+      blocked: s.blocked, blockedDesks: s.blockedDesks,
+      waiting: (s.waiting && s.waiting.items || []).map((i) => i.id + ":" + i.source + ":" + i.text),
+      waitingState: s.waiting && (s.waiting.status + ":" + s.waiting.onHuman + ":" + s.waiting.count),
       roster: (s.roster || []).map((r) => r.desk + ":" + r.status + ":" + r.runs + ":" + r.tokens),
     });
   }
@@ -1504,13 +1995,21 @@ function serve(root, slug, port) {
   // The task board and the gate rail are read off files, not events. Watch them
   // too, or the floor shows a workplan that landed minutes ago as still absent.
   // watchFile on a path that does not exist yet is legal and fires when it appears.
+  // The bus and the intake questions are files, not events: an agent that stops
+  // to ask something writes one of these and nothing else. Watch them or the
+  // floor learns the pipeline is waiting only when the next run happens to start.
   [path.join(featureDir, "state.json"),
    path.join(featureDir, "05-architecture", "workplan.md"),
-   path.join(featureDir, "07-implementation")]
+   path.join(featureDir, "07-implementation"),
+   path.join(featureDir, "bus"),
+   path.join(featureDir, "00-intake", "questions.md"),
+   path.join(featureDir, "00-intake", "answers.md")]
     .forEach((target) => fs.watchFile(target, { interval: 2000 }, () => rebuild()));
   // A run in progress needs its elapsed clock to keep advancing even when the log
   // is quiet, so force a push periodically while anything is running.
-  setInterval(() => { if (state.running) rebuild(true); }, 5000).unref?.();
+  setInterval(() => {
+    if (state.running || (state.waiting && state.waiting.waiting)) rebuild(true);
+  }, 5000).unref?.();
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://localhost");
@@ -1576,6 +2075,15 @@ if (args.serve) {
   } else {
     const dir = writeStatic(args.root, slug, state);
     process.stdout.write(`floor: wrote ${path.join(dir, "pipeline-floor.html")}\n`);
+    // Said before the gaps, and said plainly: a paused pipeline is the one thing
+    // a reader has to act on, and it is worth nothing buried under a hundred
+    // disclosure lines.
+    if (state.waiting && state.waiting.waiting) {
+      process.stdout.write(`waiting on ${state.waiting.onHuman ? "you" : "another desk"} (${state.waiting.count}):\n`);
+      state.waiting.items.forEach((i) => {
+        process.stdout.write(`  - ${i.from ? i.from + " → " : ""}${i.human ? "you" : i.to} · ${i.text}  [${i.source}]\n`);
+      });
+    }
     // Grouped, defects first. A hundred and forty loose sentences is the same
     // information nobody reads; the kind and the count are what belong in a
     // report, with the detail underneath them.

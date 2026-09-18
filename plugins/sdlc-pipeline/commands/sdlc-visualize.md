@@ -37,9 +37,11 @@ node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --serve
 ```
 
 Run it in the background — it stays up. It prints the URL (default `http://localhost:4317`; pass
-`--port` if that is taken). It watches `history/events.jsonl`, `state.json`, the workplan and the
-task records, and pushes every change to the open page over SSE, so the floor tracks the pipeline
-without being regenerated and without a reload.
+`--port` if that is taken). It watches `history/events.jsonl`, `state.json`, the workplan, the task
+records, `bus/` and `00-intake/questions.md`, and pushes every change to the open page over SSE, so
+the floor tracks the pipeline without being regenerated and without a reload. The bus and the intake
+questions are watched because a pipeline that stops to ask something writes a file and emits no
+event at all — without them the floor would learn it had stopped only when something else moved.
 
 Then open that URL with the Browser preview tool.
 
@@ -59,14 +61,27 @@ affects no gate.
 
 The desks are the live picture; the panel is the record.
 
-- **Working right now** — one row per agent with an open `phase_start`, each with the task it was
-  given and its own elapsed clock, counting from the timestamp that agent recorded.
+- **Right now** — one row per agent with an open `phase_start`, each with the task it was given and
+  its own elapsed clock, counting from the timestamp that agent recorded; and above them, every
+  **open question**: who asked, who owes the answer, the question itself, the file it is written in
+  and how long it has been outstanding.
+- **Waiting** is a state of its own, and the most important one on the page. An agent that stopped
+  to ask something looks in the event log exactly like an agent thinking hard — both are a
+  `phase_start` with no `run_complete` — so the floor reads the four records that do say it: an open
+  `bus/` file, a `question_asked` with no `question_answered`, blocking questions in
+  `00-intake/questions.md` with no `answers.md` beside them, and `state.json`'s `status`,
+  `blocked_on` and `open_questions`. A waiting desk is violet with its hand up, never the working
+  amber; its gate reads `blocked`, not `pending`; the header says **waiting on you**; and the time
+  spent waiting is never added to the agent's worked time — it is a person's turnaround, not the
+  pipeline's. A question explicitly marked `blocking: false` has a default the asker may proceed
+  under, so it is listed as open without stopping its desk.
 - **Board** — the workplan tasks with their status, desk, time and token cost; every gate with its
   status, run count and cost; and **up next**, the gates still ahead in the order `/sdlc` runs them
   with the desks that will run them. Up next is the one thing no event can report — the log records
   what happened, never what is scheduled — so it is derived from the phase sequence and the gate map.
-- **Agents** — every desk on the floor grouped into working, done, queued and not-run, with runs,
-  total time and tokens used.
+- **Agents** — every desk on the floor grouped into waiting, working, stalled, done, queued and
+  not-run, with runs, total time and tokens used. Waiting is listed first: it is the only group a
+  reader can act on this minute.
 - **Feed** — the event log as it arrives, at the times the events actually carry.
 - **Gaps** — what the floor cannot show honestly on its own, grouped by kind and marked with what
   kind of limit each one is. It is the same list you report in step 2, on the page itself, so a
@@ -99,8 +114,9 @@ on its own. Each group carries a `nature`, and that is the order to work through
 
 - **`unresolved`** — the log contradicts itself, and somebody can go and fix the logging. Completions
   with no start anywhere, tasks with no usable record, runs that named no task, agent ids that are
-  neither a desk nor a known alias of one, `run_usage` that matched no run. These are the ones worth
-  raising.
+  neither a desk nor a known alias of one, `run_usage` that matched no run, and a gate outcome whose
+  phase maps to no gate — that verdict is missing from the rail entirely, so say so. These are the
+  ones worth raising.
 - **`derived`** — the floor inferred something, and the line says exactly how. Open runs the log
   itself closed out (a cycle ended, a gate reached a verdict without them, the agent was re-run, or
   `/sdlc-resume` reconciled the workspace afterwards — the floor calls these **stalled**, not
@@ -108,8 +124,12 @@ on its own. Each group carries a `nature`, and that is the order to work through
   different phase labels and paired on its own `duration_ms`; an agent id mapped onto its desk; a
   duration derived from the timestamp gap.
 - **`irreducible`** — no log could ever settle it, so it is a standing caveat rather than a defect.
-  A `phase_start` with nothing after it at all is shown as working, because from the log alone
-  "running now" and "interrupted a moment ago" are indistinguishable — say which you believe it is.
+  A `phase_start` with nothing after it at all, and no unanswered question behind it, is shown as
+  working, because from the log alone "running now" and "interrupted a moment ago" are
+  indistinguishable — say which you believe it is. An open run whose agent does have an unanswered
+  question is shown as waiting instead; the log cannot prove the agent is still sitting on it, only
+  that the question is unanswered. A question marked non-blocking is listed without stopping its
+  desk, and whether the agent really proceeded under its default is not something the log records.
   Also: runs with no recorded token usage; more than three concurrent implementer tasks sharing
   desks A/B/C; `sdlc-debugger` and fix-mode `sdlc-implementer` time attributed to the most recently
   failed gate; pipeline machinery (`sdlc-orchestrator`, `sdlc-resume`) having no desk by design; a
@@ -123,6 +143,10 @@ In your reply, state:
 - The real elapsed wall-clock and the current cycle — take these from `state.json`'s `wallClockMs`
   and `cycle`, which are the same numbers `/sdlc-timing` reports, so the two never disagree
 - Whether anything is running right now, what it is working on, and how long it has been at it
+- **Whether the pipeline is waiting on anybody** — take it from `state.json`'s `waiting`: every open
+  question, who owes the answer, and how long it has been open. If it is waiting on the human, say
+  so first, quote the questions, and say where they are written. A floor showing a stopped pipeline
+  is worth nothing if the reply buries the reason it stopped.
 - What runs next
 - Everything from `gapGroups` — by group and count, in nature order, as step 2 describes
 
