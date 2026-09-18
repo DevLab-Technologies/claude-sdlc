@@ -208,6 +208,7 @@ const GAP_KINDS = {
   "desk-shared":       { nature: "irreducible", title: "desks showing merged logs" },
   "gate-attributed":   { nature: "irreducible", title: "time attributed to a gate by approximation" },
   "gate-skipped":      { nature: "irreducible", title: "gates skipped by this feature's track" },
+  "gate-unmapped":     { nature: "unresolved",  title: "gate outcomes that map to no gate" },
   "cycle-rail":        { nature: "irreducible", title: "what the gate rail covers" },
   "tokens-missing":    { nature: "irreducible", title: "runs with no token usage recorded" },
   "tokens-unmatched":  { nature: "unresolved",  title: "run_usage events that matched no run" },
@@ -1003,15 +1004,31 @@ function buildState(root, slug) {
   // Only the current cycle's events overrule: opening cycle n+1 resets gates to
   // pending in state.json, and an outcome from a closed cycle is not a claim
   // about this one.
+  // A gate outcome whose phase and agent are both off the map lights no pill and
+  // sets no status. Passing over it in silence is the one thing this floor must
+  // not do: the record would show a gate that never reached a verdict, which is
+  // a different claim from the one the log actually makes. Collected here and
+  // named once per phase — this loop sees every gate event, including the ones
+  // the step pass above skipped for the same reason.
+  const unmapped = new Map();
   const gateStatus = readStateGates(featureDir);
   for (const g of gateEvents) {
     const gate = PHASE_GATE[g.phase] || AGENT_GATE[g.agent];
-    if (!gate) continue;
+    if (!gate) {
+      const k = `${g.phase}\u0000${g.agent}`;
+      const seen = unmapped.get(k) || { phase: g.phase, agent: g.agent, n: 0 };
+      seen.n++;
+      unmapped.set(k, seen);
+      continue;
+    }
     if ((g.cycle ?? 1) !== cycles) {
       if (!gateStatus[gate]) gateStatus[gate] = g.event === "gate_failed" ? "failed" : "passed";
       continue;
     }
     gateStatus[gate] = g.event === "gate_failed" ? "failed" : "passed";
+  }
+  for (const u of unmapped.values()) {
+    gaps.add("gate-unmapped", `${u.n} gate outcome(s) recorded by '${u.agent}' under phase '${u.phase}', which maps to no gate on this floor — no pill is lit and no gate status is set, so that verdict is missing from the rail entirely. Add the phase to PHASE_GATE, or the agent to AGENT_GATE.`);
   }
   skipped.forEach((g) => { gateStatus[g] = "skipped"; });
 

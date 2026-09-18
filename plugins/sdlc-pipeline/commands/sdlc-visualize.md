@@ -114,8 +114,9 @@ on its own. Each group carries a `nature`, and that is the order to work through
 
 - **`unresolved`** — the log contradicts itself, and somebody can go and fix the logging. Completions
   with no start anywhere, tasks with no usable record, runs that named no task, agent ids that are
-  neither a desk nor a known alias of one, `run_usage` that matched no run. These are the ones worth
-  raising.
+  neither a desk nor a known alias of one, `run_usage` that matched no run, and a gate outcome whose
+  phase maps to no gate — that verdict is missing from the rail entirely, so say so. These are the
+  ones worth raising.
 - **`derived`** — the floor inferred something, and the line says exactly how. Open runs the log
   itself closed out (a cycle ended, a gate reached a verdict without them, the agent was re-run, or
   `/sdlc-resume` reconciled the workspace afterwards — the floor calls these **stalled**, not
