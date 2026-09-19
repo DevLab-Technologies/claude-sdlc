@@ -47,9 +47,11 @@ The protocol core is split; **read `tracks-and-models.md`, `parallel-safety.md`,
    node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --serve
    ```
 
-   Run it in the background. It prints its URL (default `http://localhost:4317`; pass `--port` if
-   that one is taken), then watches the workspace and pushes every new event to the open page. Open
-   that URL with the browser preview tool and give the human the link in your first reply. From
+   Run it in the background. It prints two URLs (default port `4317`; pass `--port` if that one is
+   taken): `floor:` is this feature's own floor, `home:` lists every feature and bug in the
+   workspace, each opening its floor. It then watches the workspace and pushes every new event to
+   the open pages. Open the `floor:` URL with the browser preview tool and give the human that link
+   in your first reply; mention the `home:` one if the workspace has other features. From
    there it tracks the pipeline by itself: do not regenerate it between phases, and do not restart
    it per agent.
 
