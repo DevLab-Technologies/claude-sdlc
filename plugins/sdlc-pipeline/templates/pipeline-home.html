@@ -160,6 +160,9 @@
   .card.ready     { border-left-color: var(--signal); }
   .card.idle      { border-left-color: var(--idle); }
   .card.not-started { border-left-color: var(--panel-line); opacity: .7; cursor: default; }
+  .card.unreadable { border-left-color: var(--bad); cursor: default; }
+  .card.unreadable .activity { color: var(--bad); }
+  .card.unreadable .activity::before { background: var(--bad); }
 
   .card-top {
     display: flex;
@@ -364,6 +367,7 @@
     { key: "ready", label: "ready to ship", live: false },
     { key: "shipped", label: "shipped", live: false },
     { key: "not-started", label: "registered, not started", live: false },
+    { key: "unreadable", label: "could not be read", live: false },
   ];
 
   var ACTIVITY_WORDS = {
@@ -374,6 +378,7 @@
     "ready": "ready to ship",
     "shipped": "shipped",
     "not-started": "not started",
+    "unreadable": "could not be read",
   };
 
   var brandTagEl = document.getElementById("brandTag");
@@ -445,7 +450,7 @@
   }
 
   function renderCard(f) {
-    var isLink = f.hasWorkspace;
+    var isLink = f.hasWorkspace && !f.error;
     var card = el(isLink ? "a" : "div", "card " + f.activity);
     if (isLink) {
       // Relative, so the link survives being served behind a prefix: the home
@@ -495,7 +500,9 @@
     }
     card.appendChild(meta);
 
-    if (!f.hasWorkspace) {
+    if (f.error) {
+      card.appendChild(el("div", "line", "the floor could not be built from this workspace: " + f.error));
+    } else if (!f.hasWorkspace) {
       card.appendChild(el("div", "line", "registered, but no workspace under .sdlc/features yet — nothing to open."));
     } else if (f.empty) {
       card.appendChild(el("div", "line", "no events in this run's log yet — nothing has run."));
@@ -520,7 +527,7 @@
         if (r.task) line.appendChild(document.createTextNode(" " + r.task));
       });
       if (f.agentsWorking > (f.workingOn || []).length) {
-        line.appendChild(document.createTextNode(" and " + (f.agentsWorking - f.workingOn.length) + " more"));
+        line.appendChild(document.createTextNode(" and " + (f.agentsWorking - (f.workingOn || []).length) + " more"));
       }
       card.appendChild(line);
     } else if (f.stalled) {

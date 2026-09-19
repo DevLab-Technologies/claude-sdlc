@@ -2056,7 +2056,9 @@
     var blockingItems = w.items.filter(function (it) { return it.blocking; });
     var openItems = w.items.filter(function (it) { return !it.blocking; });
     var fold = null;
-    if (blockingItems.length && openItems.length) {
+    // Folded whenever there are any: with no blocking question at all the card
+    // is otherwise every non-blocking one in full, which is the long card again.
+    if (openItems.length) {
       fold = el("button", "fold");
       fold.type = "button";
       fold.setAttribute("aria-expanded", String(nonBlockingOpen));

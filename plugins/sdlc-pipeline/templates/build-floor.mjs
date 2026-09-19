@@ -2003,17 +2003,23 @@ function listFeatures(root, registry) {
 
 // One home-screen row, cut from the same state the floor renders so the two
 // pages never disagree about whether a run is working, waiting or shipped.
-function summarizeFeature(root, slug, state, hasWorkspace, registry) {
+function summarizeFeature(root, slug, state, hasWorkspace, registry, error) {
   const meta = readFeatureMeta(root, slug, registry);
   const st = state || {};
   const w = st.waiting || {};
   const nowRunning = st.nowRunning || [];
   // One word a reader can sort by. Waiting on a person outranks everything —
-  // it is the only row somebody can act on this minute.
+  // it is the only row somebody can act on this minute. state.json's own
+  // status is read after the derived waits: when the pipeline wrote that it
+  // stopped on somebody and no question survives to say what on, the band
+  // still has to agree with the status word printed on the same card.
   const activity = !hasWorkspace ? "not-started"
+    : error ? "unreadable"
     : st.shipped ? "shipped"
     : w.blocking && w.onHuman ? "waiting-human"
     : w.blocking ? "waiting"
+    : meta.status === "awaiting_human" ? "waiting-human"
+    : meta.status === "blocked" ? "waiting"
     : st.running ? "running"
     : st.empty ? "not-started"
     : meta.status === "ready_to_ship" ? "ready"
@@ -2022,6 +2028,7 @@ function summarizeFeature(root, slug, state, hasWorkspace, registry) {
     slug,
     ...meta,
     hasWorkspace,
+    error: error || null,
     empty: !!st.empty || !hasWorkspace,
     activity,
     running: !!st.running,
@@ -2040,7 +2047,15 @@ function summarizeFeature(root, slug, state, hasWorkspace, registry) {
       blockingCount: w.blockingCount || 0,
       // The first question in full: a home screen that says "waiting on you" and
       // makes the reader open the floor to learn what for has not saved a click.
-      first: (w.items && w.items[0]) ? { from: w.items[0].from || null, text: w.items[0].text || "" } : null,
+      first: (() => {
+        // The question the header is about: a blocking one, addressed to a
+        // person when the header says "waiting on you" — not whichever item
+        // happens to come first in the list.
+        const items = w.items || [];
+        const it = items.find((i) => i.blocking && (!w.onHuman || i.human))
+          || items.find((i) => i.blocking) || items[0];
+        return it ? { from: it.from || null, text: it.text || "" } : null;
+      })(),
     },
     gates: st.gates || GATES,
     gateStatus: st.gateStatus || {},
@@ -2058,15 +2073,19 @@ function summarizeFeature(root, slug, state, hasWorkspace, registry) {
 // Sort order is the order somebody should look: waiting on a person, then
 // waiting on another desk, then working, then idle, ready, shipped, and last the
 // ones that never started. Within a band, the most recently active first.
-const ACTIVITY_ORDER = { "waiting-human": 0, "waiting": 1, "running": 2, "idle": 3, "ready": 4, "shipped": 5, "not-started": 6 };
+const ACTIVITY_ORDER = { "waiting-human": 0, "waiting": 1, "running": 2, "idle": 3, "ready": 4, "shipped": 5, "not-started": 6, "unreadable": 7 };
 
-function buildHome(root, states) {
+// `errors` maps a slug to why its floor could not be built. Such a run is
+// listed as unreadable rather than silently classified from an empty state,
+// which read as "idle" and linked to a floor that did not exist.
+function buildHome(root, states, errors = new Map()) {
   // Read once per rebuild, not once per feature: the registry is the same file
   // for every row.
   const registry = readRegistry(root);
   const features = listFeatures(root, registry).map((f) => {
     const state = f.hasWorkspace ? (states.get(f.slug) || null) : null;
-    return summarizeFeature(root, f.slug, state, f.hasWorkspace, registry);
+    const error = f.hasWorkspace && !state ? (errors.get(f.slug) || "no floor session") : null;
+    return summarizeFeature(root, f.slug, state, f.hasWorkspace, registry, error);
   });
   features.sort((a, b) => (ACTIVITY_ORDER[a.activity] - ACTIVITY_ORDER[b.activity])
     || ((b.lastEventTs || 0) - (a.lastEventTs || 0)) || a.slug.localeCompare(b.slug));
@@ -2170,6 +2189,7 @@ function createFloorSession(root, slug, onChange) {
     rebuild,
     subscribe(res) { clients.add(res); },
     unsubscribe(res) { clients.delete(res); },
+    get listeners() { return clients.size; },
     // Whether the elapsed clocks on this floor are moving, so the server knows
     // to push a fresh state periodically even while the log is quiet.
     get ticking() { return !!(state.running || (state.waiting && state.waiting.waiting)); },
@@ -2208,11 +2228,12 @@ function serve(root, focus, port) {
   const featuresDir = path.join(root, ".sdlc", "features");
 
   const floors = new Map();          // slug -> session
+  const failed = new Map();          // slug -> why its floor could not be built
   const homeClients = new Set();
   let home = null;
 
   function homeFingerprint(h) {
-    return JSON.stringify(h.features.map((f) => [f.slug, f.title, f.kind, f.status, f.phase, f.activity,
+    return JSON.stringify(h.features.map((f) => [f.slug, f.title, f.kind, f.status, f.phase, f.activity, f.error,
       f.cycle, f.agentsWorking, f.stalled, f.waiting, f.gateStatus, f.skippedGates, f.activeGates, f.blockedGates, f.issues,
       f.tokens, f.hasWorkspace, f.workingOn]));
   }
@@ -2220,7 +2241,7 @@ function serve(root, focus, port) {
   function pushHome(force) {
     try {
       const states = new Map([...floors.values()].map((s) => [s.slug, s.state]));
-      const next = buildHome(root, states);
+      const next = buildHome(root, states, failed);
       const changed = !home || homeFingerprint(next) !== homeFingerprint(home);
       home = next;
       if (!changed && !force) return;
@@ -2241,7 +2262,9 @@ function serve(root, focus, port) {
       if (!floors.has(slug)) {
         try {
           floors.set(slug, createFloorSession(root, slug, () => pushHome()));
+          failed.delete(slug);
         } catch (err) {
+          failed.set(slug, err.message);
           process.stderr.write(`build-floor: could not open a floor for ${slug}: ${err.message}\n`);
         }
       }
@@ -2259,14 +2282,19 @@ function serve(root, focus, port) {
     .forEach((target) => fs.watchFile(target, { interval: 2000 }, () => { syncFloors(); pushHome(); }));
 
   // A run in progress needs its elapsed clock to keep advancing even when the log
-  // is quiet, so force a push periodically while anything is running. The home
-  // screen carries the same clocks, so it is pushed on the same beat.
+  // is quiet, so force a push periodically while anything is running — but only
+  // to pages that are open. Each rebuild re-parses that feature's whole log, and
+  // both pages tick their clocks locally between pushes, so a floor nobody is
+  // watching is left to its file watchers. The home is pushed on the same beat
+  // when it has a reader.
   setInterval(() => {
     let any = false;
     for (const s of floors.values()) {
-      if (s.ticking) { s.rebuild(true); any = true; }
+      if (!s.ticking) continue;
+      any = true;
+      if (s.listeners) s.rebuild(true);
     }
-    if (any) pushHome(true);
+    if (any && homeClients.size) pushHome(true);
   }, 5000).unref?.();
 
   function sendHtml(res, file) {
