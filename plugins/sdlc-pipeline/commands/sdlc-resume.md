@@ -92,7 +92,8 @@ other — and so the human can watch the re-runs land rather than reading about 
 node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --serve
 ```
 
-Open the URL it prints with the browser preview tool and hand over the link. The floor derives its
+Open the `floor:` URL it prints with the browser preview tool and hand over the link (the `home:` URL
+beside it lists every feature and bug in the workspace). The floor derives its
 own state from the log each time it changes, so the quarantining in step 3 needs nothing from you
 here. If the port is taken, retry once on `--port 4318`; if that fails, say so and resume anyway.
 

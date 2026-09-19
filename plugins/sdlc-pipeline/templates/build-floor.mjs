@@ -11,6 +11,9 @@
  *
  *   node build-floor.mjs --feature <slug>              write floor/state.json once
  *   node build-floor.mjs --feature <slug> --serve      serve + push updates live
+ *   node build-floor.mjs --serve                       serve every feature: a home
+ *                                                      screen listing them, each
+ *                                                      opening its own floor
  *
  * Zero dependencies. Node 18+.
  */
@@ -289,19 +292,10 @@ function resolveFeature(root, given) {
     if (!fs.existsSync(dir)) fail(`no feature '${given}' under ${featuresDir}`);
     return given;
   }
-  let slugs = [];
-  const registry = path.join(root, ".sdlc", "registry.json");
-  if (fs.existsSync(registry)) {
-    try {
-      const reg = JSON.parse(fs.readFileSync(registry, "utf8"));
-      const list = Array.isArray(reg) ? reg : reg.features || [];
-      slugs = list.map((f) => (typeof f === "string" ? f : f.slug)).filter(Boolean);
-    } catch { /* fall through to directory listing */ }
-  }
-  if (!slugs.length && fs.existsSync(featuresDir)) {
-    slugs = fs.readdirSync(featuresDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory()).map((e) => e.name);
-  }
+  // The same list the home screen shows, minus the entries with nothing to
+  // render: a registered slug whose workspace was never created cannot be the
+  // one feature here, and offering it as a choice sends the caller to a 404.
+  const slugs = listFeatures(root).filter((f) => f.hasWorkspace).map((f) => f.slug);
   if (slugs.length === 1) return slugs[0];
   if (!slugs.length) fail(`no features found under ${featuresDir}`);
   fail(`several features found — pass --feature <slug>. Available: ${slugs.join(", ")}`);
@@ -690,7 +684,7 @@ function buildState(root, slug) {
     // unreadable line, a bad timestamp — is why the log looks empty, and the
     // CLI prints from the groups.
     gaps.add("log-empty", `no events in ${logPath} — nothing has run yet.`);
-    return { slug, empty: true, generatedAt: now,
+    return { slug, ...readFeatureMeta(root, slug), empty: true, generatedAt: now,
       gaps: gaps.lines(),
       gapGroups: gaps.groups(),
       steps: [], desks: {}, plan: [], upNext: [], roster: [], tasks: [], nowRunning: [],
@@ -1056,6 +1050,10 @@ function buildState(root, slug) {
 
   return {
     slug,
+    // Title, kind, status, phase and track — the pipeline's own words for what
+    // this run is, read off the registry and state.json. The floor puts the
+    // title in its header and the home screen files the run under its kind.
+    ...readFeatureMeta(root, slug),
     empty: false,
     generatedAt: Date.now(),
     firstEventTs: firstTs,
@@ -1935,14 +1933,171 @@ function writeStatic(root, slug, state) {
 }
 
 /* ============================================================
+   FEATURES — what the registry and each workspace say a run is
+   ============================================================ */
+
+// A slug is a directory name under .sdlc/features and, when serving, a URL
+// segment. Anything else — a path separator, a dot-dot — is refused rather than
+// resolved, so a request can never read outside the features directory.
+const SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+function isSlug(s) { return typeof s === "string" && SLUG_RE.test(s) && s !== "." && s !== ".."; }
+
+function readRegistry(root) {
+  const registry = path.join(root, ".sdlc", "registry.json");
+  if (!fs.existsSync(registry)) return [];
+  try {
+    const reg = JSON.parse(fs.readFileSync(registry, "utf8"));
+    const list = Array.isArray(reg) ? reg : reg.features || [];
+    return list.map((f) => (typeof f === "string" ? { slug: f } : f)).filter((f) => f && isSlug(f.slug));
+  } catch { return []; }
+}
+
+function readStateFile(featureDir) {
+  const statePath = path.join(featureDir, "state.json");
+  if (!fs.existsSync(statePath)) return null;
+  try {
+    const st = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    return st && typeof st === "object" ? st : null;
+  } catch { return null; }
+}
+
+// The registry entry and state.json describe the same run; state.json is the
+// pipeline's source of truth and wins wherever both speak. `kind` is the one
+// thing only the registry records — /sdlc-bug writes it, and older registries
+// carry only the bug- prefix on the slug, so that is the fallback.
+function readFeatureMeta(root, slug, registry) {
+  const entry = (registry || readRegistry(root)).find((f) => f.slug === slug) || {};
+  const st = readStateFile(path.join(root, ".sdlc", "features", slug)) || {};
+  const kind = entry.kind || entry.type || st.kind
+    || (/^bug-/.test(slug) ? "bug" : "feature");
+  return {
+    title: st.title || entry.title || slug,
+    kind: kind === "bug" ? "bug" : "feature",
+    status: st.status || entry.status || null,
+    phase: st.phase || entry.phase || null,
+    track: st.track || entry.track || null,
+    created: st.created || entry.created || null,
+  };
+}
+
+// Every run this workspace knows about: the registry's list joined with the
+// directories that actually exist. A registered slug with no directory is still
+// listed — it was asked for and never started, which is worth seeing — but it
+// has nothing to open, and the home screen says so instead of linking to a 404.
+function listFeatures(root, registry) {
+  const featuresDir = path.join(root, ".sdlc", "features");
+  const seen = new Map();
+  for (const f of (registry || readRegistry(root))) {
+    seen.set(f.slug, { slug: f.slug, hasWorkspace: fs.existsSync(path.join(featuresDir, f.slug)) });
+  }
+  if (fs.existsSync(featuresDir)) {
+    for (const e of fs.readdirSync(featuresDir, { withFileTypes: true })) {
+      if (e.isDirectory() && isSlug(e.name) && !seen.has(e.name)) {
+        seen.set(e.name, { slug: e.name, hasWorkspace: true });
+      }
+    }
+  }
+  return [...seen.values()];
+}
+
+// One home-screen row, cut from the same state the floor renders so the two
+// pages never disagree about whether a run is working, waiting or shipped.
+function summarizeFeature(root, slug, state, hasWorkspace, registry) {
+  const meta = readFeatureMeta(root, slug, registry);
+  const st = state || {};
+  const w = st.waiting || {};
+  const nowRunning = st.nowRunning || [];
+  // One word a reader can sort by. Waiting on a person outranks everything —
+  // it is the only row somebody can act on this minute.
+  const activity = !hasWorkspace ? "not-started"
+    : st.shipped ? "shipped"
+    : w.blocking && w.onHuman ? "waiting-human"
+    : w.blocking ? "waiting"
+    : st.running ? "running"
+    : st.empty ? "not-started"
+    : meta.status === "ready_to_ship" ? "ready"
+    : "idle";
+  return {
+    slug,
+    ...meta,
+    hasWorkspace,
+    empty: !!st.empty || !hasWorkspace,
+    activity,
+    running: !!st.running,
+    shipped: !!st.shipped,
+    cycle: st.cycle || null,
+    wallClockMs: st.wallClockMs || 0,
+    generatedAt: st.generatedAt || Date.now(),
+    lastEventTs: st.lastEventTs || null,
+    agentsWorking: nowRunning.length,
+    workingOn: nowRunning.slice(0, 4).map((r) => ({
+      desk: (r.desk || r.agent || "").replace(/^sdlc-/, ""), task: r.task || r.gate || r.phase || null,
+    })),
+    stalled: st.stalled || 0,
+    waiting: {
+      count: w.count || 0, blocking: !!w.blocking, onHuman: !!w.onHuman,
+      blockingCount: w.blockingCount || 0,
+      // The first question in full: a home screen that says "waiting on you" and
+      // makes the reader open the floor to learn what for has not saved a click.
+      first: (w.items && w.items[0]) ? { from: w.items[0].from || null, text: w.items[0].text || "" } : null,
+    },
+    gates: st.gates || GATES,
+    gateStatus: st.gateStatus || {},
+    skippedGates: st.skippedGates || [],
+    // The gates with a desk at them right now, so the home strip can light the
+    // same pill the floor's rail marks active or blocked.
+    activeGates: [...new Set(nowRunning.map((r) => r.gate).filter(Boolean))],
+    blockedGates: [...new Set((st.nowBlocked || []).map((r) => r.gate).filter(Boolean))],
+    issues: st.issues || { blocker: 0, major: 0, verified: 0 },
+    tokens: st.tokens || { total: 0, reportedRuns: 0, totalRuns: 0 },
+    gapCount: (st.gaps || []).length,
+  };
+}
+
+// Sort order is the order somebody should look: waiting on a person, then
+// waiting on another desk, then working, then idle, ready, shipped, and last the
+// ones that never started. Within a band, the most recently active first.
+const ACTIVITY_ORDER = { "waiting-human": 0, "waiting": 1, "running": 2, "idle": 3, "ready": 4, "shipped": 5, "not-started": 6 };
+
+function buildHome(root, states) {
+  // Read once per rebuild, not once per feature: the registry is the same file
+  // for every row.
+  const registry = readRegistry(root);
+  const features = listFeatures(root, registry).map((f) => {
+    const state = f.hasWorkspace ? (states.get(f.slug) || null) : null;
+    return summarizeFeature(root, f.slug, state, f.hasWorkspace, registry);
+  });
+  features.sort((a, b) => (ACTIVITY_ORDER[a.activity] - ACTIVITY_ORDER[b.activity])
+    || ((b.lastEventTs || 0) - (a.lastEventTs || 0)) || a.slug.localeCompare(b.slug));
+  const count = (k) => features.filter((f) => f.activity === k).length;
+  return {
+    generatedAt: Date.now(),
+    root: path.basename(root),
+    features,
+    totals: {
+      features: features.filter((f) => f.kind === "feature").length,
+      bugs: features.filter((f) => f.kind === "bug").length,
+      running: count("running"),
+      waitingHuman: count("waiting-human"),
+      waiting: count("waiting"),
+      shipped: count("shipped"),
+      agentsWorking: features.reduce((a, f) => a + f.agentsWorking, 0),
+    },
+  };
+}
+
+/* ============================================================
    SERVE — state.json over HTTP, updates over SSE
    ============================================================ */
 
-function serve(root, slug, port) {
+// One feature's live floor: its state, the watchers that rebuild it, and the
+// pages listening for pushes. The home screen owns one of these per feature so
+// its rows are cut from exactly the state each floor renders.
+function createFloorSession(root, slug, onChange) {
   const featureDir = path.join(root, ".sdlc", "features", slug);
   const logPath = path.join(featureDir, "history", "events.jsonl");
   const runsDir = path.join(featureDir, "history", "runs");
-  const tplPath = path.join(HERE, "pipeline-floor.html");
 
   let state = buildState(root, slug);
   const clients = new Set();
@@ -1955,6 +2110,7 @@ function serve(root, slug, port) {
     return JSON.stringify({
       steps: s.steps, gaps: s.gaps, skippedGates: s.skippedGates,
       issues: s.issues, running: s.running, cycle: s.cycle, empty: s.empty,
+      title: s.title, status: s.status, phase: s.phase,
       // The board and the roster move on file writes that emit no event at all —
       // a workplan landing, a task record flipping to complete, a gate reset in
       // state.json. Leaving them out of the fingerprint is what would make the
@@ -1981,8 +2137,9 @@ function serve(root, slug, port) {
       if (!changed && !force) return;
       const payload = `data: ${JSON.stringify(state)}\n\n`;
       for (const res of clients) res.write(payload);
+      if (changed && onChange) onChange(slug);
     } catch (err) {
-      process.stderr.write(`build-floor: rebuild failed: ${err.message}\n`);
+      process.stderr.write(`build-floor: rebuild of ${slug} failed: ${err.message}\n`);
     }
   }
 
@@ -1990,56 +2147,193 @@ function serve(root, slug, port) {
   // seen reliably; fs.watch misses appends on some filesystems.
   // Wrapped, not passed directly: watchFile hands the listener (curr, prev) Stats,
   // which would arrive as a truthy `force` and push on every poll.
-  fs.watchFile(logPath, { interval: 1000 }, () => rebuild());
-  if (fs.existsSync(runsDir)) fs.watchFile(runsDir, { interval: 2000 }, () => rebuild());
-  // The task board and the gate rail are read off files, not events. Watch them
-  // too, or the floor shows a workplan that landed minutes ago as still absent.
   // watchFile on a path that does not exist yet is legal and fires when it appears.
-  // The bus and the intake questions are files, not events: an agent that stops
-  // to ask something writes one of these and nothing else. Watch them or the
-  // floor learns the pipeline is waiting only when the next run happens to start.
-  [path.join(featureDir, "state.json"),
-   path.join(featureDir, "05-architecture", "workplan.md"),
-   path.join(featureDir, "07-implementation"),
-   path.join(featureDir, "bus"),
-   path.join(featureDir, "00-intake", "questions.md"),
-   path.join(featureDir, "00-intake", "answers.md")]
-    .forEach((target) => fs.watchFile(target, { interval: 2000 }, () => rebuild()));
+  const watched = [
+    [logPath, 1000], [runsDir, 2000],
+    // The task board and the gate rail are read off files, not events. Watch them
+    // too, or the floor shows a workplan that landed minutes ago as still absent.
+    [path.join(featureDir, "state.json"), 2000],
+    [path.join(featureDir, "05-architecture", "workplan.md"), 2000],
+    [path.join(featureDir, "07-implementation"), 2000],
+    // The bus and the intake questions are files, not events: an agent that stops
+    // to ask something writes one of these and nothing else. Watch them or the
+    // floor learns the pipeline is waiting only when the next run happens to start.
+    [path.join(featureDir, "bus"), 2000],
+    [path.join(featureDir, "00-intake", "questions.md"), 2000],
+    [path.join(featureDir, "00-intake", "answers.md"), 2000],
+  ];
+  watched.forEach(([target, interval]) => fs.watchFile(target, { interval }, () => rebuild()));
+
+  return {
+    slug,
+    get state() { return state; },
+    rebuild,
+    subscribe(res) { clients.add(res); },
+    unsubscribe(res) { clients.delete(res); },
+    // Whether the elapsed clocks on this floor are moving, so the server knows
+    // to push a fresh state periodically even while the log is quiet.
+    get ticking() { return !!(state.running || (state.waiting && state.waiting.waiting)); },
+    stop() {
+      watched.forEach(([target]) => fs.unwatchFile(target));
+      for (const res of clients) res.end();
+      clients.clear();
+    },
+  };
+}
+
+function sseHeaders(res) {
+  res.writeHead(200, {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "connection": "keep-alive",
+  });
+}
+
+function attachSse(req, res, first, sessions) {
+  sseHeaders(res);
+  res.write(`data: ${JSON.stringify(first)}\n\n`);
+  sessions.subscribe(res);
+  const ka = setInterval(() => res.write(": keep-alive\n\n"), 20000);
+  req.on("close", () => { clearInterval(ka); sessions.unsubscribe(res); });
+}
+
+// Serve every feature in the workspace: the home screen at /, and each
+// feature's floor under /f/<slug>/. `focus` is the feature the caller asked
+// for — its floor URL is what gets printed, and the legacy root paths
+// (/state.json, /stream, /pipeline-floor.html) keep answering for it so a link
+// handed out before the home screen existed still works.
+function serve(root, focus, port) {
+  const tplFloor = path.join(HERE, "pipeline-floor.html");
+  const tplHome = path.join(HERE, "pipeline-home.html");
+  const featuresDir = path.join(root, ".sdlc", "features");
+
+  const floors = new Map();          // slug -> session
+  const homeClients = new Set();
+  let home = null;
+
+  function homeFingerprint(h) {
+    return JSON.stringify(h.features.map((f) => [f.slug, f.title, f.kind, f.status, f.phase, f.activity,
+      f.cycle, f.agentsWorking, f.stalled, f.waiting, f.gateStatus, f.skippedGates, f.activeGates, f.blockedGates, f.issues,
+      f.tokens, f.hasWorkspace, f.workingOn]));
+  }
+
+  function pushHome(force) {
+    try {
+      const states = new Map([...floors.values()].map((s) => [s.slug, s.state]));
+      const next = buildHome(root, states);
+      const changed = !home || homeFingerprint(next) !== homeFingerprint(home);
+      home = next;
+      if (!changed && !force) return;
+      const payload = `data: ${JSON.stringify(home)}\n\n`;
+      for (const res of homeClients) res.write(payload);
+    } catch (err) {
+      process.stderr.write(`build-floor: home rebuild failed: ${err.message}\n`);
+    }
+  }
+
+  // Open a floor for every feature that has a workspace, and close the ones
+  // whose directory has gone. Called at start and whenever the registry or the
+  // features directory changes, so a feature registered after the server came
+  // up appears on the home screen without a restart.
+  function syncFloors() {
+    const present = new Set(listFeatures(root).filter((f) => f.hasWorkspace).map((f) => f.slug));
+    for (const slug of present) {
+      if (!floors.has(slug)) {
+        try {
+          floors.set(slug, createFloorSession(root, slug, () => pushHome()));
+        } catch (err) {
+          process.stderr.write(`build-floor: could not open a floor for ${slug}: ${err.message}\n`);
+        }
+      }
+    }
+    for (const [slug, session] of floors) {
+      if (!present.has(slug)) { session.stop(); floors.delete(slug); }
+    }
+  }
+
+  syncFloors();
+  if (focus && !floors.has(focus)) fail(`no feature '${focus}' under ${featuresDir}`);
+  pushHome(true);
+
+  [path.join(root, ".sdlc", "registry.json"), featuresDir]
+    .forEach((target) => fs.watchFile(target, { interval: 2000 }, () => { syncFloors(); pushHome(); }));
+
   // A run in progress needs its elapsed clock to keep advancing even when the log
-  // is quiet, so force a push periodically while anything is running.
+  // is quiet, so force a push periodically while anything is running. The home
+  // screen carries the same clocks, so it is pushed on the same beat.
   setInterval(() => {
-    if (state.running || (state.waiting && state.waiting.waiting)) rebuild(true);
+    let any = false;
+    for (const s of floors.values()) {
+      if (s.ticking) { s.rebuild(true); any = true; }
+    }
+    if (any) pushHome(true);
   }, 5000).unref?.();
+
+  function sendHtml(res, file) {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(fs.readFileSync(file, "utf8"));
+  }
+  function sendJson(res, obj) {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify(obj));
+  }
+  function notFound(res, msg) {
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+    res.end(msg || "not found");
+  }
+
+  function floorRoute(res, session, rest, req) {
+    if (rest === "" || rest === "pipeline-floor.html") return sendHtml(res, tplFloor);
+    if (rest === "state.json") return sendJson(res, session.state);
+    if (rest === "stream") return attachSse(req, res, session.state, session);
+    return notFound(res);
+  }
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://localhost");
-    if (url.pathname === "/" || url.pathname === "/pipeline-floor.html") {
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-      res.end(fs.readFileSync(tplPath, "utf8"));
-      return;
-    }
-    if (url.pathname === "/state.json") {
-      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-      res.end(JSON.stringify(state));
-      return;
-    }
-    if (url.pathname === "/stream") {
-      res.writeHead(200, {
-        "content-type": "text/event-stream",
-        "cache-control": "no-cache",
-        "connection": "keep-alive",
+    const p = url.pathname;
+
+    if (p === "/") return sendHtml(res, tplHome);
+    if (p === "/home.json") return sendJson(res, home);
+    if (p === "/home-stream") {
+      return attachSse(req, res, home, {
+        subscribe: (r) => homeClients.add(r), unsubscribe: (r) => homeClients.delete(r),
       });
-      res.write(`data: ${JSON.stringify(state)}\n\n`);
-      clients.add(res);
-      const ka = setInterval(() => res.write(": keep-alive\n\n"), 20000);
-      req.on("close", () => { clearInterval(ka); clients.delete(res); });
-      return;
     }
-    res.writeHead(404).end("not found");
+
+    const m = p.match(/^\/f\/([^/]+)(?:\/(.*))?$/);
+    if (m) {
+      // decodeURIComponent throws on a malformed escape, and an uncaught throw
+      // here would take the whole server down with it.
+      let slug;
+      try { slug = decodeURIComponent(m[1]); } catch { return notFound(res, "malformed feature path"); }
+      if (!isSlug(slug) || !floors.has(slug)) return notFound(res, `no feature '${slug}' on this floor`);
+      // The page fetches "stream" and "state.json" relative to its own URL, so
+      // the floor has to live under a trailing slash for those to land here.
+      if (m[2] === undefined) {
+        res.writeHead(302, { location: `/f/${encodeURIComponent(slug)}/` });
+        return res.end();
+      }
+      return floorRoute(res, floors.get(slug), m[2], req);
+    }
+
+    // Legacy root paths: the floor for the focused feature, as before the home
+    // screen existed. Without a focus there is nothing they can honestly answer.
+    if (p === "/pipeline-floor.html" || p === "/state.json" || p === "/stream") {
+      if (!focus) return notFound(res, "no --feature given — open / for the list of features, or /f/<slug>/ for one floor");
+      return floorRoute(res, floors.get(focus), p.slice(1), req);
+    }
+    notFound(res);
   });
 
   server.listen(port, () => {
-    process.stdout.write(`floor: http://localhost:${port}  (feature: ${slug}, live)\n`);
+    const base = `http://localhost:${port}`;
+    if (focus) {
+      process.stdout.write(`floor: ${base}/f/${encodeURIComponent(focus)}/  (feature: ${focus}, live)\n`);
+      process.stdout.write(`home:  ${base}/  (every feature and bug in this workspace)\n`);
+    } else {
+      process.stdout.write(`floor: ${base}/  (${floors.size} feature${floors.size === 1 ? "" : "s"}, live — each opens its own floor)\n`);
+    }
   });
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") fail(`port ${port} is in use — pass --port <n>`);
@@ -2056,7 +2350,10 @@ if (args.help) {
   process.stdout.write(`build-floor — render a feature's real history as the Pipeline Floor
 
   --feature <slug>   feature to render (default: the only one in .sdlc/registry.json)
-  --serve            serve the floor and push updates as the pipeline runs
+  --serve            serve the floor and push updates as the pipeline runs. With
+                     --feature the printed URL is that feature's floor; without
+                     it, the home screen listing every feature and bug, each
+                     opening its own floor. Either way both are served.
   --port <n>         port for --serve (default 4317)
   --root <dir>       project root containing .sdlc (default: cwd)
   --json             print the built state to stdout instead of writing files
@@ -2064,11 +2361,13 @@ if (args.help) {
   process.exit(0);
 }
 
-const slug = resolveFeature(args.root, args.feature);
-
 if (args.serve) {
-  serve(args.root, slug, args.port);
+  // Serving without --feature is the home screen, not an error: every feature
+  // is listed and each opens its own floor. A given feature is validated inside
+  // serve() and becomes the URL that gets printed.
+  serve(args.root, args.feature || null, args.port);
 } else {
+  const slug = resolveFeature(args.root, args.feature);
   const state = buildState(args.root, slug);
   if (args.json) {
     process.stdout.write(JSON.stringify(state, null, 2) + "\n");
