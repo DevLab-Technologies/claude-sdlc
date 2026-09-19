@@ -29,7 +29,8 @@ The protocol core is all you need; read from its `sections/` directory only if t
    node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --serve
    ```
 
-   Open the URL it prints with the browser preview tool, give the human the link, and say it is live
+   Open the `floor:` URL it prints with the browser preview tool (the `home:` one lists every
+   feature and bug in the workspace), give the human the link, and say it is live
    only while this session is. If the port is taken, retry once on `--port 4318`; if that fails too,
    say so and fix the defect anyway — the visualization never blocks the work.
 

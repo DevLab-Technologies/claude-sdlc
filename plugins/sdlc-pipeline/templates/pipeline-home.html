@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pipeline Floor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Archivo+Expanded:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Same tokens as pipeline-floor.html — the home screen is the floor's front
+     door, and it has to read as the same building. */
+  :root {
+    --floor: #171f2b;
+    --floor-line: #212c3c;
+    --wall: #10161f;
+    --panel: #131b26;
+    --panel-line: #22303f;
+    --ink: #dce6f0;
+    --ink-dim: #7c8ba0;
+    --ink-faint: #4c5a6e;
+    --signal: #ffb545;
+    --signal-dim: #8a6127;
+    --ok: #5fd3a0;
+    --warn: #ffb545;
+    --bad: #ff6b6b;
+    --ask: #b9a2ff;
+    --ask-dim: #6f5fbf;
+    --idle: #46536a;
+
+    --font-display: "Archivo Expanded", "Archivo", sans-serif;
+    --font-ui: "Archivo", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--wall);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 18px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-line);
+    flex-wrap: wrap;
+  }
+
+  .brand { display: flex; align-items: baseline; gap: 8px; margin-right: auto; min-width: 0; }
+
+  .brand .mark {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .brand .mark span { color: var(--signal); }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-faint);
+    border: 1px solid var(--panel-line);
+    border-radius: 3px;
+    padding: 2px 6px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .totals {
+    display: flex;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    white-space: nowrap;
+  }
+
+  .totals b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .totals .ask b { color: var(--ask); }
+  .totals .live b { color: var(--ok); }
+
+  main {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--panel-line) transparent;
+  }
+
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 6px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .section-label .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ok); box-shadow: 0 0 6px var(--ok);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  /* One run per card. The whole card is the link: the title, the gates and the
+     status are all reasons to open it, so none of them should be the only place
+     a click lands. */
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-left-width: 3px;
+    border-radius: 4px;
+    padding: 12px 14px 12px 13px;
+    color: inherit;
+    text-decoration: none;
+    min-width: 0;
+    transition: border-color .15s, background .15s;
+  }
+
+  a.card:hover, a.card:focus-visible { background: #172230; border-color: var(--ink-faint); outline: none; }
+  a.card:focus-visible { box-shadow: 0 0 0 2px var(--signal); }
+
+  .card.running   { border-left-color: var(--ok); }
+  .card.waiting-human, .card.waiting { border-left-color: var(--ask); }
+  .card.shipped   { border-left-color: var(--ink-faint); }
+  .card.ready     { border-left-color: var(--signal); }
+  .card.idle      { border-left-color: var(--idle); }
+  .card.not-started { border-left-color: var(--panel-line); opacity: .7; cursor: default; }
+
+  .card-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    min-width: 0;
+  }
+
+  .kind {
+    flex: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--panel-line);
+    color: var(--ink-dim);
+    background: var(--floor);
+  }
+
+  .kind.bug { color: var(--bad); border-color: #5a2b2b; }
+  .kind.feature { color: var(--signal); border-color: var(--signal-dim); }
+
+  .slug {
+    color: var(--ink-faint);
+    text-transform: none;
+    letter-spacing: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .activity {
+    margin-left: auto;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-dim);
+  }
+
+  .activity::before {
+    content: "";
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--idle);
+  }
+
+  .card.running .activity { color: var(--ok); }
+  .card.running .activity::before { background: var(--ok); box-shadow: 0 0 6px var(--ok); animation: pulse 1.6s ease-in-out infinite; }
+  .card.waiting-human .activity, .card.waiting .activity { color: var(--ask); }
+  .card.waiting-human .activity::before, .card.waiting .activity::before { background: var(--ask); box-shadow: 0 0 6px var(--ask); }
+  .card.shipped .activity { color: var(--ink-dim); }
+  .card.shipped .activity::before { background: var(--ok); }
+  .card.ready .activity { color: var(--signal); }
+  .card.ready .activity::before { background: var(--signal); }
+
+  .title {
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+
+  /* Thirteen gates as a strip, in the order the pipeline runs them. Colour
+     carries the outcome; the dashed strike on a skipped gate carries it for a
+     reader who cannot see the colour. */
+  .gates {
+    display: grid;
+    grid-template-columns: repeat(13, 1fr);
+    gap: 3px;
+  }
+
+  .gate {
+    height: 6px;
+    border-radius: 2px;
+    background: var(--floor);
+    border: 1px solid var(--panel-line);
+  }
+
+  .gate.passed  { background: var(--ok); border-color: var(--ok); }
+  .gate.failed  { background: var(--bad); border-color: var(--bad); }
+  .gate.active  { background: var(--signal); border-color: var(--signal); }
+  .gate.blocked { background: var(--ask); border-color: var(--ask); }
+  .gate.skipped { background: transparent; border-style: dashed; border-color: var(--ink-faint); }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+  }
+
+  .meta .k { color: var(--ink-faint); }
+  .meta .v { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .line {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-dim);
+    overflow-wrap: anywhere;
+  }
+
+  .line .who { color: var(--signal); font-weight: 600; }
+  .line.ask { color: var(--ask); }
+  .line.ask .q { color: var(--ink); display: block; margin-top: 2px; }
+  .line.ask .k { font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 10px; }
+
+  .issues {
+    display: flex;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-top: auto;
+  }
+
+  .issues b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .issues .bad b { color: var(--bad); }
+  .issues .ok b { color: var(--ok); }
+  .issues .zero b { color: var(--ink-faint); }
+
+  .empty {
+    color: var(--ink-faint);
+    font-style: italic;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 30px 0;
+    text-align: center;
+  }
+
+  .empty code { font-style: normal; color: var(--signal); }
+
+  footer {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 8px 18px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    background: var(--panel);
+    border-top: 1px solid var(--panel-line);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    flex-wrap: wrap;
+  }
+
+  footer .k { color: var(--ink-faint); text-transform: uppercase; font-size: 9.5px; letter-spacing: .06em; margin-right: 6px; }
+  footer .v { color: var(--ink); }
+  footer .proto { margin-left: auto; border: 1px solid var(--panel-line); border-radius: 3px; padding: 2px 6px; font-size: 10px; }
+
+  @media (max-width: 560px) {
+    main { padding: 12px; }
+    .grid { grid-template-columns: 1fr; }
+    .totals { gap: 10px; font-size: 10px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .section-label .dot, .activity::before { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark">PIPELINE <span>FLOOR</span></div>
+    <div class="tag" id="brandTag">connecting&hellip;</div>
+  </div>
+  <div class="totals" id="totals"></div>
+</header>
+
+<main id="main">
+  <div class="empty" id="emptyNote">connecting&hellip;</div>
+  <div id="sections"></div>
+</main>
+
+<footer>
+  <span><span class="k">features</span><span class="v" id="outFeatures">—</span></span>
+  <span><span class="k">bugs</span><span class="v" id="outBugs">—</span></span>
+  <span><span class="k">agents working</span><span class="v" id="outAgents">—</span></span>
+  <span class="proto" id="protoTag">reading .sdlc/registry.json</span>
+</footer>
+
+<script>
+(function () {
+  var GATES = ["intake", "research", "product", "design", "figma-design", "ux-audit",
+    "architecture", "test-plan", "implementation", "review", "qa", "ui-qa", "release"];
+
+  // Which band each run is filed under, in the order a reader should look.
+  var BANDS = [
+    { key: "waiting-human", label: "waiting on you", live: false },
+    { key: "waiting", label: "waiting on another desk", live: false },
+    { key: "running", label: "working right now", live: true },
+    { key: "idle", label: "idle — stopped at the last event", live: false },
+    { key: "ready", label: "ready to ship", live: false },
+    { key: "shipped", label: "shipped", live: false },
+    { key: "not-started", label: "registered, not started", live: false },
+  ];
+
+  var ACTIVITY_WORDS = {
+    "waiting-human": "waiting on you",
+    "waiting": "waiting on an answer",
+    "running": "running",
+    "idle": "idle",
+    "ready": "ready to ship",
+    "shipped": "shipped",
+    "not-started": "not started",
+  };
+
+  var brandTagEl = document.getElementById("brandTag");
+  var protoTagEl = document.getElementById("protoTag");
+  var totalsEl = document.getElementById("totals");
+  var sectionsEl = document.getElementById("sections");
+  var emptyNoteEl = document.getElementById("emptyNote");
+  var outFeatures = document.getElementById("outFeatures");
+  var outBugs = document.getElementById("outBugs");
+  var outAgents = document.getElementById("outAgents");
+
+  var lastHome = null;
+  var stream = null;
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  // Same table as /sdlc-timing and the floor: days and hours, hours and
+  // minutes, minutes and seconds — never a raw millisecond figure.
+  function fmtDuration(ms) {
+    if (!isFinite(ms) || ms < 0) ms = 0;
+    var s = Math.floor(ms / 1000);
+    var m = Math.floor(s / 60);
+    var h = Math.floor(m / 60);
+    var d = Math.floor(h / 24);
+    if (d > 0) return d + "d" + (h % 24 ? " " + (h % 24) + "h" : "");
+    if (h > 0) return h + "h" + (m % 60 ? " " + (m % 60) + "m" : "");
+    if (m > 0) return m + "m" + (s % 60 ? " " + (s % 60) + "s" : "");
+    if (s > 0) return s + "s";
+    return ms + "ms";
+  }
+
+  function setStatus(kind, text) {
+    brandTagEl.textContent = (kind === "live" ? "live · " : "") + text;
+    brandTagEl.style.color = kind === "live" ? "#5fd3a0" : kind === "bad" ? "#ff6b6b"
+      : kind === "blocked" ? "#b9a2ff" : "";
+    protoTagEl.textContent = text;
+    protoTagEl.style.color = kind === "live" ? "#5fd3a0" : kind === "blocked" ? "#b9a2ff" : "";
+    protoTagEl.style.borderColor = kind === "live" ? "#245741" : kind === "blocked" ? "#4b3f85" : "";
+  }
+
+  function describe(h) {
+    var t = h.totals || {};
+    var n = (h.features || []).length;
+    if (!n) return "no features registered";
+    if (t.waitingHuman) {
+      return "waiting on you · " + t.waitingHuman + " of " + n
+        + (t.running ? " · " + t.running + " running" : "");
+    }
+    if (t.running) return t.running + " of " + n + " running · " + t.agentsWorking + " agent" + (t.agentsWorking === 1 ? "" : "s") + " working";
+    return n + " on the floor · nothing running";
+  }
+
+  // The gate strip reads state the same way the floor's rail does: an outcome
+  // from the builder's gateStatus, skipped from the track, and the phase the
+  // run is at right now shown as active when it has no outcome yet.
+  function gateClass(f, g) {
+    if ((f.skippedGates || []).indexOf(g) >= 0) return "skipped";
+    if ((f.blockedGates || []).indexOf(g) >= 0) return "blocked";
+    if ((f.activeGates || []).indexOf(g) >= 0) return "active";
+    var v = f.gateStatus && f.gateStatus[g];
+    if (v === "passed") return "passed";
+    if (v === "failed") return "failed";
+    return "";
+  }
+
+  function renderCard(f) {
+    var isLink = f.hasWorkspace;
+    var card = el(isLink ? "a" : "div", "card " + f.activity);
+    if (isLink) {
+      // Relative, so the link survives being served behind a prefix: the home
+      // lives at the root the floors are mounted under.
+      card.href = "f/" + encodeURIComponent(f.slug) + "/";
+      card.setAttribute("aria-label", "open the floor for " + f.title);
+    }
+
+    var top = el("div", "card-top");
+    top.appendChild(el("span", "kind " + f.kind, f.kind));
+    top.appendChild(el("span", "slug", f.slug));
+    var act = el("span", "activity", ACTIVITY_WORDS[f.activity] || f.activity);
+    top.appendChild(act);
+    card.appendChild(top);
+
+    card.appendChild(el("div", "title", f.title || f.slug));
+
+    var gates = el("div", "gates");
+    (f.gates || GATES).forEach(function (g) {
+      var cell = el("span", "gate " + gateClass(f, g));
+      cell.title = g + (gateClass(f, g) ? " · " + gateClass(f, g) : "");
+      gates.appendChild(cell);
+    });
+    card.appendChild(gates);
+
+    var meta = el("div", "meta");
+    function kv(k, v) {
+      if (v == null || v === "") return;
+      var s = el("span");
+      s.appendChild(el("span", "k", k + " "));
+      s.appendChild(el("span", "v", String(v)));
+      meta.appendChild(s);
+    }
+    kv("status", f.status && f.status.replace(/_/g, " "));
+    kv("phase", f.phase);
+    kv("cycle", f.cycle);
+    kv("track", f.track);
+    if (f.hasWorkspace && !f.empty) {
+      var elapsed = el("span");
+      elapsed.appendChild(el("span", "k", "elapsed "));
+      var v = el("span", "v el", fmtDuration(f.wallClockMs));
+      // Only a running clock advances between pushes; a stopped one is the
+      // log's own span and stays put, exactly as the floor's footer does.
+      if (f.running) { v.dataset.base = String(f.wallClockMs); v.dataset.since = String(f.generatedAt); }
+      elapsed.appendChild(v);
+      meta.appendChild(elapsed);
+    }
+    card.appendChild(meta);
+
+    if (!f.hasWorkspace) {
+      card.appendChild(el("div", "line", "registered, but no workspace under .sdlc/features yet — nothing to open."));
+    } else if (f.empty) {
+      card.appendChild(el("div", "line", "no events in this run's log yet — nothing has run."));
+    }
+
+    var w = f.waiting || {};
+    if (w.blocking && w.first) {
+      var ask = el("div", "line ask");
+      ask.appendChild(el("span", "k", (w.onHuman ? "waiting on you" : "waiting on an answer")
+        + (w.blockingCount > 1 ? " · " + w.blockingCount + " questions" : "")));
+      ask.appendChild(el("span", "q", (w.first.from ? w.first.from.replace(/^sdlc-/, "") + ": " : "") + w.first.text));
+      card.appendChild(ask);
+    }
+
+    if (f.agentsWorking) {
+      var line = el("div", "line");
+      line.appendChild(document.createTextNode(f.agentsWorking + " agent" + (f.agentsWorking === 1 ? "" : "s") + " working"
+        + (f.stalled ? " · " + f.stalled + " stalled" : "") + " — "));
+      (f.workingOn || []).forEach(function (r, i) {
+        if (i) line.appendChild(document.createTextNode(", "));
+        line.appendChild(el("span", "who", r.desk));
+        if (r.task) line.appendChild(document.createTextNode(" " + r.task));
+      });
+      if (f.agentsWorking > (f.workingOn || []).length) {
+        line.appendChild(document.createTextNode(" and " + (f.agentsWorking - f.workingOn.length) + " more"));
+      }
+      card.appendChild(line);
+    } else if (f.stalled) {
+      card.appendChild(el("div", "line", f.stalled + " run" + (f.stalled === 1 ? "" : "s") + " the pipeline left behind — /sdlc-resume clears them"));
+    }
+
+    if (f.hasWorkspace && !f.empty) {
+      var iss = f.issues || {};
+      var issues = el("div", "issues");
+      function stat(label, n, cls) {
+        var s = el("span", (n ? cls : "zero"));
+        s.appendChild(el("b", null, String(n || 0)));
+        s.appendChild(document.createTextNode(" " + label));
+        issues.appendChild(s);
+      }
+      stat("blocker", iss.blocker, "bad");
+      stat("major", iss.major, "bad");
+      stat("verified", iss.verified, "ok");
+      card.appendChild(issues);
+    }
+    return card;
+  }
+
+  function render(h) {
+    lastHome = h;
+    var feats = h.features || [];
+    sectionsEl.innerHTML = "";
+    if (!feats.length) {
+      emptyNoteEl.innerHTML = "no features registered in <code>.sdlc/registry.json</code> and none under <code>.sdlc/features/</code> &mdash; start one with <code>/sdlc</code> or <code>/sdlc-bug</code>.";
+      emptyNoteEl.style.display = "";
+    } else {
+      emptyNoteEl.style.display = "none";
+    }
+    BANDS.forEach(function (b) {
+      var rows = feats.filter(function (f) { return f.activity === b.key; });
+      if (!rows.length) return;
+      var label = el("p", "section-label");
+      if (b.live) label.appendChild(el("span", "dot"));
+      label.appendChild(document.createTextNode(b.label + " · " + rows.length));
+      sectionsEl.appendChild(label);
+      var grid = el("div", "grid");
+      rows.forEach(function (f) { grid.appendChild(renderCard(f)); });
+      sectionsEl.appendChild(grid);
+    });
+
+    var t = h.totals || {};
+    totalsEl.innerHTML = "";
+    function total(label, n, cls) {
+      var s = el("span", cls);
+      s.appendChild(el("b", null, String(n || 0)));
+      s.appendChild(document.createTextNode(" " + label));
+      totalsEl.appendChild(s);
+    }
+    total("features", t.features);
+    total("bugs", t.bugs);
+    if (t.waitingHuman) total("waiting on you", t.waitingHuman, "ask");
+    if (t.running) total("running", t.running, "live");
+    if (t.shipped) total("shipped", t.shipped);
+    outFeatures.textContent = String(t.features || 0);
+    outBugs.textContent = String(t.bugs || 0);
+    outAgents.textContent = String(t.agentsWorking || 0);
+
+    setStatus(t.waitingHuman ? "blocked" : t.running ? "live" : "wait", describe(h));
+  }
+
+  function updateClocks() {
+    var now = Date.now();
+    var els = sectionsEl.querySelectorAll(".el[data-since]");
+    for (var i = 0; i < els.length; i++) {
+      var base = Number(els[i].dataset.base), since = Number(els[i].dataset.since);
+      if (isFinite(base) && isFinite(since)) els[i].textContent = fmtDuration(base + Math.max(0, now - since));
+    }
+  }
+
+  function connect() {
+    if (!window.EventSource) { pollOnce(); return; }
+    stream = new EventSource("home-stream");
+    stream.onmessage = function (evt) {
+      try { render(JSON.parse(evt.data)); } catch (e) { /* keep the last good state */ }
+    };
+    stream.onerror = function () {
+      if (stream && stream.readyState === EventSource.CLOSED) {
+        stream = null;
+        setStatus("bad", lastHome ? "disconnected — showing the last state received" : "no live server");
+        if (!lastHome) pollOnce();
+        return;
+      }
+      setStatus("bad", lastHome ? "reconnecting…" : "connecting…");
+    };
+  }
+
+  function pollOnce() {
+    fetch("home.json", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () {
+        setStatus("bad", "no server — start one with /sdlc-visualize");
+        emptyNoteEl.textContent = "no server behind this page. Run /sdlc-visualize to start one.";
+      });
+  }
+
+  setStatus("wait", "connecting...");
+  connect();
+  setInterval(updateClocks, 1000);
+})();
+</script>
+</body>
+</html>

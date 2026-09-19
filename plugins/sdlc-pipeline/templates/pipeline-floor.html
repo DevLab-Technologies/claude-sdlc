@@ -110,6 +110,38 @@
     white-space: nowrap;
   }
 
+  .home-link {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    text-decoration: none;
+    border: 1px solid var(--panel-line);
+    border-radius: 3px;
+    padding: 3px 7px;
+    white-space: nowrap;
+    align-self: center;
+  }
+
+  .home-link:hover, .home-link:focus-visible { color: var(--signal); border-color: var(--signal-dim); outline: none; }
+  .home-link[hidden] { display: none; }
+
+  /* The feature this floor belongs to. It sits between the mark and the status
+     tag and gives way first: the status is the one thing the header must never
+     truncate. */
+  .feature-name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    max-width: 34vw;
+  }
+
+  .feature-name[hidden] { display: none; }
+  .feature-name .kind { color: var(--ink-faint); text-transform: uppercase; font-size: 9.5px; letter-spacing: .05em; margin-right: 6px; }
+
   .gate-rail {
     display: flex;
     gap: 4px;
@@ -235,6 +267,31 @@
   .panel-block {
     border-bottom: 1px solid var(--panel-line);
     padding: 12px 14px;
+  }
+
+  /* The right-now block grows with its rows up to a share of the panel, then
+     scrolls inside itself. The label, the summary line and the sign-off card
+     stay pinned; only the questions and the running rows move. Nothing is cut:
+     the fortieth agent is one scroll away rather than pushing the board, the
+     roster and the feed below the fold. */
+  .panel-block.now-block {
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 42%;
+  }
+
+  .now-block .panel-label, .now-block .current-line, .now-block .signoff-card { flex: none; }
+
+  .now-scroll {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--panel-line) transparent;
+    /* Room for the scrollbar so a row's clock is never under it. */
+    padding-right: 2px;
   }
 
   .panel-label {
@@ -504,6 +561,20 @@
     font-size: 10px;
   }
   .waiting-card .q { display: block; margin-top: 4px; }
+  .waiting-card .fold {
+    display: block;
+    margin-top: 8px;
+    padding: 0;
+    background: none;
+    border: none;
+    font: inherit;
+    font-size: 10.5px;
+    color: var(--ask);
+    cursor: pointer;
+    text-decoration: underline dotted;
+  }
+  .waiting-card .fold:hover, .waiting-card .fold:focus-visible { color: var(--ink); outline: none; }
+  .waiting-card .folded[hidden] { display: none; }
   .waiting-card .src { color: var(--ink-faint); font-size: 10px; }
   .now-row .el { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
   .now-row .task { color: var(--ink-dim); }
@@ -791,6 +862,12 @@
     aside { overflow-y: auto; }
     .panel-scroll { flex: 0 0 auto; }
     .tab-body { min-height: 200px; }
+    /* Stacked, the panel is the scroll container, so a percentage max-height on
+       the block has nothing to be a percentage of. Bound the rows by the
+       viewport instead. */
+    .panel-block.now-block { max-height: none; flex: none; }
+    .now-scroll { max-height: 38vh; max-height: 38dvh; }
+    .feature-name { max-width: 100%; }
 
     .panel-block { padding: 9px 12px; }
     .current-line { font-size: 12px; }
@@ -852,7 +929,12 @@
 
 <header>
   <div class="brand">
+    <!-- Shown only when this floor is one of several served from a home
+         screen: the page fetches its state relative to its own URL, so a floor
+         mounted at /f/<slug>/ has the home two levels up. -->
+    <a class="home-link" id="homeLink" href="../../" hidden aria-label="Back to all features">&larr; all</a>
     <div class="mark">PIPELINE <span>FLOOR</span></div>
+    <div class="feature-name" id="featureName" hidden></div>
     <div class="tag" id="brandTag">connecting&hellip;</div>
   </div>
   <div class="gate-rail" id="gateRail"></div>
@@ -866,16 +948,22 @@
   </div>
 
   <aside>
-    <div class="panel-block">
+    <div class="panel-block now-block">
       <p class="panel-label"><span class="dot"></span>right now</p>
       <div class="current-line" id="currentLine">waiting for the first event</div>
-      <!-- Open questions, from the bus, the event log, intake's questions.md or
-           state.json. Nothing in the run brackets records these, which is why a
-           stopped pipeline used to read as a working one. -->
-      <div class="waiting-card" id="waitingCard"></div>
-      <!-- One row per agent with an open phase_start, each with its own elapsed
-           clock counting from the timestamp that agent recorded. -->
-      <div id="nowList"></div>
+      <!-- The questions and the running rows scroll together inside a block
+           that never takes more than its share of the panel. Forty concurrent
+           agents used to push the board, the roster and the feed off the bottom
+           of the screen; every row is still here, it just scrolls. -->
+      <div class="now-scroll">
+        <!-- Open questions, from the bus, the event log, intake's questions.md or
+             state.json. Nothing in the run brackets records these, which is why a
+             stopped pipeline used to read as a working one. -->
+        <div class="waiting-card" id="waitingCard"></div>
+        <!-- One row per agent with an open phase_start, each with its own elapsed
+             clock counting from the timestamp that agent recorded. -->
+        <div id="nowList"></div>
+      </div>
       <div class="signoff-card" id="signoffCard">
         <span class="k">NOT verified —</span> <span id="signoffText"></span>
       </div>
@@ -1786,7 +1874,28 @@
 
   var brandTagEl = document.getElementById("brandTag");
   var protoTagEl = document.getElementById("protoTag");
+  var homeLinkEl = document.getElementById("homeLink");
+  var featureNameEl = document.getElementById("featureName");
   var status = { kind: "wait", text: "connecting..." };
+
+  // Served from the home screen, this floor lives at /f/<slug>/ and the home is
+  // two levels up. A static snapshot opened from disk, or the legacy single-
+  // feature root, has no home to go back to, so the link stays hidden there.
+  if (/\/f\/[^/]+\/(?:pipeline-floor\.html)?$/.test(window.location.pathname)) homeLinkEl.hidden = false;
+
+  // The feature's own title, from state.json via the builder. Set once per
+  // state, so a rename lands without a reload and the tab reads as the feature
+  // rather than as one of several identical "Pipeline Floor" tabs.
+  function setFeatureName(st) {
+    var title = st && st.title && st.title !== st.slug ? st.title : (st && st.slug) || "";
+    if (!title) { featureNameEl.hidden = true; document.title = "Pipeline Floor"; return; }
+    featureNameEl.innerHTML = "";
+    if (st.kind) featureNameEl.appendChild(el("span", "kind", st.kind));
+    featureNameEl.appendChild(document.createTextNode(title));
+    featureNameEl.title = title + (st.slug ? " (" + st.slug + ")" : "");
+    featureNameEl.hidden = false;
+    document.title = title + " · Pipeline Floor";
+  }
 
   function setStatus(kind, text) {
     status = { kind: kind, text: text };
@@ -1821,6 +1930,7 @@
 
   function applyState(st) {
     lastState = st;
+    setFeatureName(st);
     renderNow(st);
     renderBoard(st);
     renderAgents(st);
@@ -1938,12 +2048,45 @@
       ? (w.humanCount === 1 ? "waiting on you" : "waiting on you — " + w.humanCount + " questions")
       : "waiting on another desk");
     waitingCardEl.appendChild(head);
-    w.items.forEach(function (it) {
+    // Blocking questions are always in full: each one is a reason the pipeline
+    // stopped. The non-blocking ones — an asker with a default who went on — are
+    // folded behind their count. On a long run they outnumber the blocking ones
+    // thirty to one, and listed in full they bury both the questions that matter
+    // and the running rows below the card.
+    var blockingItems = w.items.filter(function (it) { return it.blocking; });
+    var openItems = w.items.filter(function (it) { return !it.blocking; });
+    var fold = null;
+    if (blockingItems.length && openItems.length) {
+      fold = el("button", "fold");
+      fold.type = "button";
+      fold.setAttribute("aria-expanded", String(nonBlockingOpen));
+      fold.textContent = (nonBlockingOpen ? "hide " : "show ") + openItems.length
+        + " non-blocking question" + (openItems.length === 1 ? "" : "s");
+      fold.addEventListener("click", function () {
+        nonBlockingOpen = !nonBlockingOpen;
+        renderWaitingCard(w);
+      });
+    }
+    var folded = el("div", "folded");
+    if (fold && !nonBlockingOpen) folded.hidden = true;
+    (fold ? blockingItems : w.items).forEach(function (it) { appendQuestion(waitingCardEl, it); });
+    if (fold) {
+      waitingCardEl.appendChild(fold);
+      openItems.forEach(function (it) { appendQuestion(folded, it); });
+      waitingCardEl.appendChild(folded);
+    }
+    waitingCardEl.classList.add("show");
+  }
+
+  var nonBlockingOpen = false;
+
+  function appendQuestion(parent, it) {
+    {
       var line = el("span", "q");
       line.textContent = (it.from ? shortDesk(it.from) + " → " : "")
         + (it.human ? "you" : shortDesk(it.to || "someone"))
         + (it.blocking ? "" : " (non-blocking)") + ": " + it.text;
-      waitingCardEl.appendChild(line);
+      parent.appendChild(line);
       if (it.source) {
         // A snapshot ages against the moment it was built, not the moment it is
         // opened — a file kept for a week must not claim the question has been
@@ -1951,10 +2094,9 @@
         var asOf = (snapshotMode && lastState && lastState.generatedAt) || Date.now();
         var src = el("span", "src", it.source
           + (it.since ? " · " + fmtDuration(Math.max(0, asOf - it.since)) + " ago" : ""));
-        waitingCardEl.appendChild(src);
+        parent.appendChild(src);
       }
-    });
-    waitingCardEl.classList.add("show");
+    }
   }
 
   // Tasks first — what the work actually is — then every gate still ahead and
