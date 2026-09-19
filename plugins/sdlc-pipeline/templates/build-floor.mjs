@@ -2222,6 +2222,10 @@ function attachSse(req, res, first, sessions) {
 // for — its floor URL is what gets printed, and the legacy root paths
 // (/state.json, /stream, /pipeline-floor.html) keep answering for it so a link
 // handed out before the home screen existed still works.
+// How long a feature directory may be missing before its floor is closed: one
+// watcher poll window, so a move-aside-and-back rewrite is never seen as a removal.
+const MISSING_GRACE_MS = 2000;
+
 function serve(root, focus, port) {
   const tplFloor = path.join(HERE, "pipeline-floor.html");
   const tplHome = path.join(HERE, "pipeline-home.html");
@@ -2270,7 +2274,22 @@ function serve(root, focus, port) {
       }
     }
     for (const [slug, session] of floors) {
-      if (!present.has(slug)) { session.stop(); floors.delete(slug); }
+      if (present.has(slug)) { session.missingSince = 0; continue; }
+      // A directory moved aside and back inside one poll window is a rewrite,
+      // not a removal; closing the floor's clients on the first miss is
+      // destructive where waiting one more poll costs nothing. Measured in
+      // time, not in looks: the registry and the directory watchers both call
+      // here on the same change, and two looks in the same millisecond are
+      // still one look.
+      const now = Date.now();
+      if (!session.missingSince) {
+        session.missingSince = now;
+        // The watchers fire only on a change, so the second look has to be
+        // scheduled: nothing else may touch the directory again.
+        setTimeout(() => { syncFloors(); pushHome(); }, MISSING_GRACE_MS + 500).unref?.();
+        continue;
+      }
+      if (now - session.missingSince >= MISSING_GRACE_MS) { session.stop(); floors.delete(slug); }
     }
   }
 
@@ -2322,9 +2341,12 @@ function serve(root, focus, port) {
     const p = url.pathname;
 
     if (p === "/") return sendHtml(res, tplHome);
-    if (p === "/home.json") return sendJson(res, home);
+    // A failed first build leaves `home` null; serve an empty list rather than
+    // `null`, which the page cannot render and would sit on forever.
+    const homeState = home || { generatedAt: Date.now(), root: path.basename(root), features: [], totals: {} };
+    if (p === "/home.json") return sendJson(res, homeState);
     if (p === "/home-stream") {
-      return attachSse(req, res, home, {
+      return attachSse(req, res, homeState, {
         subscribe: (r) => homeClients.add(r), unsubscribe: (r) => homeClients.delete(r),
       });
     }
@@ -2349,6 +2371,9 @@ function serve(root, focus, port) {
     // screen existed. Without a focus there is nothing they can honestly answer.
     if (p === "/pipeline-floor.html" || p === "/state.json" || p === "/stream") {
       if (!focus) return notFound(res, "no --feature given — open / for the list of features, or /f/<slug>/ for one floor");
+      // The focused feature's directory may have gone since startup; its session
+      // is then closed, and a throw here would take the whole server down.
+      if (!floors.has(focus)) return notFound(res, `no feature '${focus}' on this floor any more`);
       return floorRoute(res, floors.get(focus), p.slice(1), req);
     }
     notFound(res);
