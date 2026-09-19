@@ -22,9 +22,10 @@ head is what used to make this command take minutes and produce inconsistent out
 
 ## Step 0 — Resolve the target
 
-Resolve the feature slug as `/sdlc-timing` does: the given slug, the one feature in
-`.sdlc/registry.json`, or ask if there are several. The builder resolves it the same way, so you can
-usually just pass `--feature` through — or omit it entirely for a single-feature workspace.
+Resolve the feature slug as `/sdlc-timing` does: the given slug, or the one feature in
+`.sdlc/registry.json`. When there are several and none was named, do not ask — serve without
+`--feature` and the home screen lists them all (step 1). The static snapshot in step 1 is the one
+mode that still needs a single feature, so resolve it there.
 
 This command needs a real `history/events.jsonl`. If the feature has no events yet, the builder says
 so and renders an empty floor with that stated on it; report that plainly and stop rather than
@@ -36,21 +37,37 @@ implying there is something to look at.
 node "${CLAUDE_PLUGIN_ROOT}/templates/build-floor.mjs" --feature <slug> --serve
 ```
 
-Run it in the background — it stays up. It prints the URL (default `http://localhost:4317`; pass
-`--port` if that is taken). It watches `history/events.jsonl`, `state.json`, the workplan, the task
-records, `bus/` and `00-intake/questions.md`, and pushes every change to the open page over SSE, so
-the floor tracks the pipeline without being regenerated and without a reload. The bus and the intake
-questions are watched because a pipeline that stops to ask something writes a file and emits no
-event at all — without them the floor would learn it had stopped only when something else moved.
+Run it in the background — it stays up. One server serves the whole workspace:
 
-Then open that URL with the Browser preview tool.
+- **`/`** is the **home screen** — every feature and bug in `.sdlc/registry.json` and under
+  `.sdlc/features/`, one card each, filed by what it needs right now: waiting on you, waiting on
+  another desk, working, idle, ready to ship, shipped, registered but never started. Each card
+  carries the title, the kind, the pipeline's own status and phase, the cycle, the track, a strip of
+  the thirteen gates, the elapsed clock, who is working on what, the first open question in full,
+  and the issue tally. Clicking a card opens that run's floor.
+- **`/f/<slug>/`** is one run's **floor**, the page described below. Its header carries the
+  feature's title and an **← all** link back to the home screen.
+
+It prints two URLs (default port `4317`; pass `--port` if that is taken): `floor:` is the floor of
+the feature you asked for, `home:` is the list. **Open the `floor:` URL** with the Browser preview
+tool when a specific feature was asked for; run it **without `--feature`** and open the single URL it
+prints when the human wants the overview or did not name one — a workspace with several features
+is no longer a reason to ask which, the home screen is the answer.
+
+The server watches every feature's `history/events.jsonl`, `state.json`, workplan, task records,
+`bus/` and `00-intake/questions.md`, plus the registry and the features directory, and pushes every
+change to the open pages over SSE, so both the floor and the home track the pipeline without being
+regenerated and without a reload. The bus and the intake questions are watched because a pipeline
+that stops to ask something writes a file and emits no event at all — without them the floor would
+learn it had stopped only when something else moved. A feature registered after the server came up
+appears on the home screen on its own.
 
 The page is live for as long as the server runs. Say that explicitly, and say that closing the
 session stops it — a page that has silently stopped updating while still looking live is a false
 signal, which is why the page itself flips its header to a disconnected state rather than freezing
 on the last good frame.
 
-**Static snapshot instead.** Drop `--serve` and the builder writes
+**Static snapshot instead.** Drop `--serve` (and name the feature, or have exactly one) and the builder writes
 `.sdlc/features/<slug>/floor/{pipeline-floor.html,state.json}` and exits. Use this when the human
 wants a file to keep or share rather than a live view. It shows the same current state, but it stops
 there — re-run the command to refresh it. `floor/` follows the same rule as `digest/` (protocol
@@ -152,7 +169,10 @@ In your reply, state:
 
 ## Changing the visualization
 
-`templates/pipeline-floor.html` renders; `templates/build-floor.mjs` derives. Keep that split.
+`templates/pipeline-floor.html` renders a floor and `templates/pipeline-home.html` renders the home
+screen; `templates/build-floor.mjs` derives everything both of them show. Keep that split — the home
+card and the floor header are cut from the same state object, which is what keeps the two pages
+from ever disagreeing about whether a run is working, waiting or shipped.
 
 - A new agent needs a desk in `DEPARTMENTS` and `ROLE_TINT` in the HTML **and** an entry in
   `DESK_IDS`, `AGENT_GATE` and `GATE_AGENTS` in the builder. Missing any part is reported as a gap
