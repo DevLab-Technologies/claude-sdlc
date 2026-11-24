@@ -19,8 +19,8 @@ enforce the gates, and keep the workspace honest.
    artifact lacks `status: complete`, a previous run was interrupted: stop and run `/sdlc-resume`
    first.** Continuing on top of partial output is how an interruption becomes a wrong verdict.
 3. Otherwise scaffold `.sdlc/features/<slug>/` per the protocol layout, write the request
-   verbatim to `brief.md`, initialize `state.json` (`cycle: 1`, all gates `pending`), and
-   register the feature in `.sdlc/registry.json`.
+   verbatim to `brief.md`, initialize `state.json` (`cycle: 1`, all gates `pending`, `budget` from
+   the track you pick below, `spend` zeroed), and register the feature in `.sdlc/registry.json`.
 4. Read `.sdlc/figma.json`. **Missing, or `available: unknown`, and the project has a user-facing
    surface? You are the only participant who can ask** — so ask, but at the right moment:
 
@@ -78,8 +78,11 @@ before.
 
 ## Pick the track before running anything
 
-Read protocol section 8 and choose `trivial` | `small` | `standard` | `large`, then record it in
-`state.json` and state it in your first reply with the reason. Running the full pipeline on a copy
+Read protocol section 8 and choose `trivial` | `small` | `standard` | `large`, then record it and
+its `budget.cycles` in `state.json`, and state both in your first reply with the reason. The budget
+is the ceiling this run escalates at rather than spending past (protocol 7a) — say it out loud at
+the start, because a human who learns the ceiling when it is hit learns it too late. Re-track
+upward and you rewrite the budget with it. Running the full pipeline on a copy
 change costs time and money without buying quality; running the trivial track on an auth change is
 the mistake that matters.
 
@@ -236,8 +239,10 @@ Rules for the sequence:
 - Static lenses must read **source**, never build output, since the suite may be rewriting it.
 - Wait for every launched lens before synthesizing. A missing lens is recorded `not run`, never
   treated as clean.
-- **Phase 8 has an inner fix loop.** A review failure does not immediately cost a cycle. Triage
-  the findings, run `sdlc-implementer` in fix mode, then re-run the **same** reviewer to verify
+- **Phase 8 has an inner fix loop, for blockers and majors only.** A review failure does not
+  immediately cost a cycle. Triage the issues — advisories have none of this, by protocol section 4,
+  so a loop that starts over `minor` findings is a loop that should not have started. Run
+  `sdlc-implementer` in fix mode, then re-run the **same** reviewer to verify
   its own findings are closed — it may re-verify what it found, since it did not fix it. Loop at
   most twice. **Re-run verify-fast when the fixers return, before the reviewer**, and verify-slow
   before the gate — and when the reviewer being re-run is `sdlc-review-tests`, re-run verify-slow
@@ -255,7 +260,9 @@ Rules for the sequence:
 ## The defect loop
 
 When review, QA, or UI QA fails, do not go straight to fixing. Triage every open issue
-using protocol section 4 (Triage):
+using protocol section 4 (Triage) — every `blocker` and `major`, which is every issue there is:
+`minor` and `nit` findings are advisories, carried into the release record and never triaged,
+fixed in a loop, or allowed to open a cycle.
 
 1. Route each issue: obvious cause -> `sdlc-implementer`; unproven, intermittent,
    regression, crash, security, or twice-reopened -> `sdlc-debugger` first; contract
@@ -268,8 +275,11 @@ using protocol section 4 (Triage):
 3. **Deduplicate by root cause.** If several issues share one `INV`, assign them to a
    single implementer as one fix.
 4. Launch implementers in fix mode, grouped so no two touch the same files.
-5. Re-run review, QA, and UI QA **in the same cycle** against the new code.
-6. `sdlc-release-gate` decides: ship, another cycle, or escalate.
+5. Re-run review, QA, and UI QA **in the same cycle** against the new code — each of them whose
+   sign-off the fixes made stale, which on a narrow fix may be one of the three. A gate whose
+   `commit_or_files` scope the fixes never touched keeps its pass (protocol 7a criterion 2), and
+   re-running it reads untouched code at the cost of a full phase.
+6. `sdlc-release-gate` decides: ship, another cycle, or escalate, and reports spend against budget.
 
 When it opens cycle `n+1`, repeat from phase 6 (or from the phase the failure points at —
 a wrong spec sends you back to phase 2, a wrong contract to phase 5).
@@ -277,8 +287,11 @@ a wrong spec sends you back to phase 2, a wrong contract to phase 5).
 ## Reporting to the human
 
 After each phase, report in two or three lines: phase, verdict, what was produced, what
-comes next. After each cycle, report: cycle number, gate results, issue counts by
-severity, root causes found, and the release-gate decision.
+comes next. After each cycle, report: cycle number against the budget, gate results, blocker and
+major counts, the advisory total as one number, root causes found, and the release-gate decision.
+Report cost as the pipeline's, not as a footnote: the `run_usage` lines you wrote are the only
+record of what the run spent, and the human paying for it should not have to run `/sdlc-timing` to
+learn it.
 
 Never claim a gate passed without having read the artifact that proves it. If something is
 blocked, say what is blocked and what you need. If the pipeline escalates, present the

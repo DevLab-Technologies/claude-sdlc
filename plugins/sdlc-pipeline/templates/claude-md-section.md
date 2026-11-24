@@ -61,7 +61,9 @@ definition names.
 Implementation, then review, then functional QA, then UI QA, then the release gate. Failures
 become issues, issues get triaged to the right role, root causes get proven, fixes get
 verified in the same cycle, and the loop repeats until every gate passes together — or until
-`max_cycles`, at which point it escalates to a human with options instead of spinning.
+`budget.cycles` — one per track, three on a standard feature — at which point it escalates to a
+human with options and its spend so far, instead of spinning. `minor` and `nit` findings are
+reported and never block a release.
 
 ## Non-negotiables
 

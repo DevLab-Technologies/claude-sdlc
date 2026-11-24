@@ -134,8 +134,12 @@ with `status: fixed`, and the previous cycle's results.
    verified, issues reopened, cases with missing or weak tests, AC coverage, and an explicit
    verdict.
 
-8. **Open issues** for every defect with exact reproduction steps, observed vs expected, and
-   the environment. A defect report someone cannot reproduce is not a defect report.
+8. **Open issues** for every `blocker` and `major` defect with exact reproduction steps, observed
+   vs expected, and the environment. A defect report someone cannot reproduce is not a defect
+   report. A `minor` or `nit` defect gets no issue: list it under
+   `## Advisories (minor, nit)`, one line each, and carry on (protocol section 4). A defect that
+   actually costs a user something is not a `minor` — rate it for what it does, not for how small
+   the fix looks.
 
 ## Gate criteria (execute mode)
 `qa: passed` when every planned case for a P0 story is `passing`, every case has a real test

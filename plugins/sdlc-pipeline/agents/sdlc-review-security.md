@@ -98,5 +98,10 @@ Protocol section 10 binds you, and it matters most here because the lead reads a
 - **Never quote code back at length** — `path:line` plus the one line that matters.
 - **Cycle 2 and later: review the delta only.** Read the diff since the previous cycle plus the
   issues raised against it, not the whole feature again. Name the baseline in your sign-off.
+- **`## Findings` is for `blocker` and `major` only.** A `minor` or a `nit` goes in
+  `## Advisories (minor, nit)` as a single line — `path:line` and the point — because it will be
+  read in the release record and never tracked as an issue (protocol section 4). That is not a
+  reason to promote one: a finding you would have to inflate to get acted on is a finding whose
+  own severity is the honest answer.
 - Omit an empty section rather than writing "none" — except `## Not covered`, which is always
   required.

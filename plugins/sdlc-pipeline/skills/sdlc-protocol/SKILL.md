@@ -90,14 +90,17 @@ feature attached — same layouts, no gate to set.
 ```json
 {
   "slug": "user-auth", "title": "…", "created": "2026-08-10",
-  "phase": "09-qa", "cycle": 2, "max_cycles": 5,
+  "phase": "09-qa", "cycle": 2,
   "track": "standard",
+  "budget": { "cycles": 3, "tokens": null },
+  "spend": { "cycles": 1, "tokens": 4120000 },
   "status": "in_progress",
   "gates": { "intake": "passed", "research": "skipped", "product": "passed",
     "design": "passed", "figma-design": "passed", "ux-audit": "passed",
     "architecture": "passed", "test-plan": "passed", "implementation": "passed",
     "review": "failed", "qa": "pending", "ui-qa": "pending", "release": "pending" },
-  "issues": { "blocker": 1, "major": 2, "minor": 4, "nit": 3 },
+  "issues": { "blocker": 1, "major": 2 },
+  "advisories": { "minor": 4, "nit": 3 },
   "design_version": 2,
   "open_questions": 0, "adrs": ["ADR-0001"], "blocked_on": null
 }
@@ -106,6 +109,10 @@ feature attached — same layouts, no gate to set.
 Gates: `pending` | `passed` | `failed` | `skipped`. A `skipped` gate needs a recorded reason.
 Status: `in_progress` | `awaiting_human` | `blocked` | `ready_to_ship` | `shipped`.
 Track: `trivial` | `small` | `standard` | `large` — see section 8, `sections/tracks-and-models.md`.
+`budget` is what this feature may spend and `spend` is what it has spent — section 7a
+(`sections/termination.md`), which also says why `budget.cycles` replaced `max_cycles`.
+`issues` counts what has an `ISSUE` file — `blocker` and `major` only; `advisories` is the `minor`
+and `nit` total (section 4). Separate keys, so an advisory total can never be read as open defects.
 `design_version`: the published Figma design version number, or `null` when there is none — see
 section 2a (`sections/design-authority.md`) and the `sdlc-figma-design` skill.
 
@@ -197,6 +204,19 @@ each signal means, what to quarantine, what to re-run — is `sections/resume.md
 
 ## 4. Issues
 
+**Only a `blocker` or a `major` becomes an issue.** A `minor` or a `nit` is an **advisory**: one
+line in the aggregate list at the end of the report that found it, totalled into `state.json` ->
+`advisories`, reproduced in the release record — and that is its whole lifecycle. No id, no file,
+no triage, no fix loop, no gate weight, and it never opens a cycle (section 7a criterion 5). A
+reviewer may still fix a mechanical one inline under section 7: fixing one is cheap, tracking it is
+not.
+
+Without the floor, hundreds of preferences carrying ids are indistinguishable from hundreds of
+defects in every count and every gate, and the pipeline spends real cycles closing them. What
+genuinely must be tracked — an advisory recurring across cycles, or one a human names — is promoted
+to `major` with the reason recorded, by the agent that owns the gate. Promote it or let it go; a
+`minor` file kept to hedge is the floor broken.
+
 `issues/ISSUE-<NNN>.md`, monotonic across the feature, numbers never reused:
 
 ```markdown
@@ -224,8 +244,11 @@ reopened_count: 0
 
 **Severity ladder.** `blocker`: breaks correctness, security, data integrity, a contract, or
 requirement fidelity. `major`: will cause a real defect or real maintenance pain. `minor`: worth
-fixing, no user impact at plausible scale. `nit`: preference. Never inflate to be heard; never
-deflate to be agreeable. Mark speculative findings `minor` and say they are speculative.
+fixing, no user impact at plausible scale. `nit`: preference. Never inflate to be heard — the floor
+above makes `major` the line between tracked and aggregated, and a finding inflated to cross it
+buys a fix loop with a reader's trust. Advisories are read, in the release record, by whoever
+decides what to clean up next. Never deflate to be agreeable. Mark speculative findings `minor` and
+say they are speculative.
 
 **Rules.** Only the opening agent or a QA agent may set `verified`. Implementers move `open` ->
 `fixed`, naming the files. `wontfix`/`deferred` need a rationale. Every reopen increments
@@ -281,7 +304,8 @@ misleading names, magic values, duplication with one obvious extraction. List ev
 verdict: passed | failed
 reviewed_by: <agent>
 cycle: <n>
-commit_or_files: <sha or file list>
+commit_or_files: <the commit sha this covers, plus the file list — the sha is what makes the
+pass auditable later; write a bare file list only where there is no VCS>
 design_version: <v<N> this covers, or none>
 ran: <commands and real results>
 verified: <what you established>
@@ -290,7 +314,10 @@ NOT verified: <what you could not check, and why — be specific>
 
 `design_version` is the published Figma design version the sign-off covers, or `none` — it is what
 lets the release gate tell a fresh pass from one that predates a design change, since these blocks
-carry no timestamp. `NOT verified` is what makes a sign-off honest; one with no stated limits claims omniscience. A
+carry no timestamp. `commit_or_files` plays the same role for code: the sha is what later lets the
+release gate ask whether anything in your scope has moved (section 7a criterion 2) and keep your
+pass when nothing has. A sign-off with no sha in a repo that has one cannot be tested that way, so
+it will be treated as stale the next time anything changes — which costs the phase a re-run. `NOT verified` is what makes a sign-off honest; one with no stated limits claims omniscience. A
 sign-off is scoped to its own gate. **Only `sdlc-release-gate` declares ship-readiness**, by
 auditing the others — rejecting any made stale by later changes, and any covering work its author
 changed beyond mechanical fixes. Never state or imply ship-readiness outside your scope.
@@ -304,6 +331,10 @@ them. Write less, without cutting substance:
   your methodology. The run record holds reasoning; the report holds conclusions.
 - **Never quote code back at length.** `path:line` plus the one line that matters.
 - **One finding, one entry.** No repeating a finding in a summary section as well.
+- **`minor` and `nit` go in one aggregate list**, one line each — `path:line` and the point, no
+  sections, no rationale, no suggested direction. Write them at the end of the report under
+  `## Advisories (minor, nit)`. They are not issues (section 4), and prose spent on them is paid
+  for twice: once writing it, once by the synthesizer reading five reports of it.
 - `## What is solid` is at most three bullets, and only where it changes someone's behavior.
 - **Cycle 2 and later: review the delta only.** Read the diff since the last cycle and the issues
   from it — not the whole feature again. Say in your sign-off that you reviewed the delta and name
