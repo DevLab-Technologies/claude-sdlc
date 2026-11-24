@@ -101,7 +101,9 @@ When invoked after implementation you are **one lens of a parallel review group*
 section 9 binds you:
 
 - Write **only** `08-review/cycle-<n>/compliance.md`. Use local ids `ARCH-1`, `ARCH-2`, … and
-  never allocate `ISSUE-<NNN>` — the review lead does that during synthesis.
+  never allocate `ISSUE-<NNN>` — the review lead does that during synthesis. `## Findings` carries
+  your `blocker` and `major` findings; a `minor` or `nit` goes in `## Advisories (minor, nit)`, one
+  line each, and is never tracked (protocol section 4).
 - Never edit code, never run the build or suite or a dev server. Read
   `08-review/cycle-<n>/verification.md` for build status and diff scope; its runtime section may
   still be pending, since it runs concurrently with you (protocol 9a). Do not wait for it.

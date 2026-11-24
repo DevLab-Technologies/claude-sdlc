@@ -95,7 +95,7 @@ verdict is the deliverable.
 Give the human, compactly:
 
 - Mode, target, and which lenses ran, were skipped, or failed
-- The verdict, and counts by severity
+- The verdict, blocker and major counts, and the advisory total as one number
 - Every blocker and major: id, one-line summary, file, and which lenses found it
 - What was fixed inline
 - The cross-cutting findings — these are usually the most valuable output

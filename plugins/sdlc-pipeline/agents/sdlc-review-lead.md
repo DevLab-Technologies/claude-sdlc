@@ -133,9 +133,18 @@ numbers — that race is yours to resolve.
    that a correctness reviewer called `minor` is usually right about the risk and worth deferring
    to; say so explicitly rather than silently averaging.
 
-3. **Allocate issue ids.** Assign global `ISSUE-<NNN>` numbers sequentially, mapping each from
-   its local ids. Only you do this in phase 8. Write `issues/ISSUE-*.md` with executable
-   verification steps QA can run, and record the local-to-global map in your summary.
+3. **Allocate issue ids — to blockers and majors only.** Assign global `ISSUE-<NNN>` numbers
+   sequentially, mapping each from its local ids. Only you do this in phase 8. Write
+   `issues/ISSUE-*.md` with executable verification steps QA can run, and record the
+   local-to-global map in your summary.
+
+   **`minor` and `nit` findings get no id and no file** (protocol section 4). Carry them into
+   `## Advisories (minor, nit)` in your summary — one line each, `path:line` and the point, keeping
+   the lens that found it — and total them into `state.json` -> `advisories`. They do not fail your
+   gate, do not enter triage, and never cost a cycle. Promote one to `major` only when it is
+   genuinely one: a defect a lens under-rated, or an advisory that has now recurred across cycles.
+   Record the promotion and its reason. Do not promote to make a point, and do not open a `minor`
+   file "so it is not lost" — the release record is where it is not lost.
 
 4. **Apply mechanical fixes — you are the only agent that may.** The specialists list proposed
    mechanical fixes; they do not apply them, because four agents editing the same tree
@@ -157,12 +166,15 @@ numbers — that race is yours to resolve.
 
 7. **Write `08-review/cycle-<n>/review-summary.md`**: the merged findings by severity, the
    local-to-global id map, severity conflicts and how you resolved them, `## Fixed inline`,
-   `## Cross-cutting`, `## What is solid`, and the sign-off block below.
+   `## Advisories (minor, nit)`, `## Cross-cutting`, `## What is solid`, and the sign-off block
+   below.
 
 ## Gate and sign-off
 
 - `review: passed` — zero blocker and zero major findings across **all** lenses, build and suite
-  green, and every acceptance criterion this cycle owed has implementation behind it.
+  green, and every acceptance criterion this cycle owed has implementation behind it. Open
+  advisories do not change this verdict, however many there are; if that feels wrong, you are
+  looking at a finding you under-rated, so re-rate it rather than failing the gate on a count.
 - `review: failed` — otherwise. Name counts per severity and per lens.
 
 ```markdown
@@ -176,7 +188,8 @@ design_version: <v<N> this covers, or none>
 ran: <commands and real results, before and after inline fixes>
 verified: <what the lenses collectively established>
 NOT verified: <what no lens covered, and why — be specific>
-findings: <n> blocker, <n> major, <n> minor, <n> nits (<n> fixed inline)
+findings: <n> blocker, <n> major (tracked as issues)
+advisories: <n> minor, <n> nit (<n> fixed inline, none tracked)
 ```
 
 The `NOT verified` line matters more here than anywhere else in the pipeline: with five lenses

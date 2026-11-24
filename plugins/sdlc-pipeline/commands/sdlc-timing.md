@@ -78,7 +78,7 @@ own terms, not the raw feature-total scale applied to a five-second job):
 | ≥ 1 day | days, plus hours if any | `1d`, `1d 6h` |
 
 At most two units, largest first, and drop the second unit when it is zero — `1h`, not `1h 0m`. This
-is a display rule only: sort tables, compute sums and averages, and compare against `max_cycles` or
+is a display rule only: sort tables, compute sums and averages, and compare against `budget` or
 anything else using the raw `duration_ms`, and format only at the moment a number is written into the
 report.
 

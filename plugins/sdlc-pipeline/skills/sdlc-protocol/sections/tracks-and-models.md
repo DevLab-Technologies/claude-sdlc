@@ -7,12 +7,17 @@ Loaded by the orchestrator only. Core protocol section 8.
 The full pipeline is built for a feature. Running all of it on a copy change wastes time and money
 without buying quality. The orchestrator picks a `track` and records it in `state.json`:
 
-| Track | Fits | Phases | Review lenses |
-|---|---|---|---|
-| `trivial` | copy, config, a constant, a dependency bump | intake -> implement -> review -> release | correctness only |
-| `small` | one contained change, no new surface or data | intake, product (stories only), test-plan, implement, review, qa | correctness + the one lens the change touches |
-| `standard` | a normal feature | all phases | all five |
-| `large` | new subsystem, migration, or auth/payment/data-model change | all phases, `max_cycles` raised | all five, plus a second security pass |
+| Track | Fits | Phases | Review lenses | Cycles |
+|---|---|---|---|---|
+| `trivial` | copy, config, a constant, a dependency bump | intake -> implement -> review -> release | correctness only | 1 |
+| `small` | one contained change, no new surface or data | intake, product (stories only), test-plan, implement, review, qa | correctness + the one lens the change touches | 2 |
+| `standard` | a normal feature | all phases | all five | 3 |
+| `large` | new subsystem, migration, or auth/payment/data-model change | all phases | all five, plus a second security pass | 5 |
+
+The last column is `budget.cycles` in `state.json` (section 7a). Write it when you record the
+track, and re-write it when you re-track upward — an escalated track that kept the old budget
+escalates to a human one cycle later for no reason. A cycle is the expensive unit in this pipeline:
+three of them on the standard track is a deliberate ceiling, not a target to reach.
 
 Two rules that keep this from becoming a quality hole:
 - **Escalate freely, never silently downgrade.** Any agent that finds the track too small for what

@@ -34,7 +34,9 @@ The protocol core is all you need; read from its `sections/` directory only if t
    only while this session is. If the port is taken, retry once on `--port 4318`; if that fails too,
    say so and fix the defect anyway — the visualization never blocks the work.
 
-3. **Open the issue first.** Write `issues/ISSUE-<NNN>.md` with everything the reporter
+3. **Open the issue first.** A reported defect always gets an issue — the severity floor in
+   protocol section 4 governs what reviewers raise on their own initiative, not what a human asked
+   to have tracked. Write `issues/ISSUE-<NNN>.md` with everything the reporter
    gave you and an honest severity. If the report is too vague to act on, list precisely
    what you need — what they did, what they expected, what happened, when it started, how
    often — and ask before burning effort on a guess.

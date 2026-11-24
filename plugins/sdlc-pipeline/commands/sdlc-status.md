@@ -9,9 +9,9 @@ For each feature, read `state.json`, `history/events.jsonl`, `issues/*.md`,
 `11-investigations/*.md`, and `bus/*.md`, then present:
 
 ## <title> (`<slug>`)
-- **Position** — phase, cycle `n` of `max_cycles`, `track`, status
+- **Position** — phase, cycle `n` of `budget.cycles`, `track`, status, and `spend` against `budget`
 - **Gates** — a single line: `intake ok | research ok | product ok | design ok | figma-design skip | ux-audit ok | architecture ok | implementation ok | review FAILED | qa - | ui-qa - | release -`
-- **Issues** — counts by severity and status; list every open blocker and major with its id,
+- **Issues** — counts by status; list every open blocker and major with its id,
   title, owner role, and whether it has a proven root cause
 - **Investigations** — open investigations and their status; flag any issue with
   `reopened_count >= 2` that has no investigation, since that is a process violation

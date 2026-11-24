@@ -103,8 +103,11 @@ amended back into it per protocol 4a so the next cycle inherits it.
    spec. Include the console and network findings and an explicit
    verdict. Save any screenshots you take under `09-qa/cycle-<n>/shots/`.
 
-9. **Open issues** for each defect with the screen, the state, how to reach it, and the
-   deviation from spec. Verify `fixed` UI issues by reproducing them in the running build.
+9. **Open issues** for each `blocker` and `major` defect with the screen, the state, how to reach
+   it, and the deviation from spec. A `minor` or `nit` deviation — a few pixels, a preference about
+   spacing — goes in `## Advisories (minor, nit)` as one line and gets no issue (protocol section
+   4). Something a user cannot read, cannot reach, or cannot operate is not minor whatever its
+   size on screen. Verify `fixed` UI issues by reproducing them in the running build.
 
 ## Verdict and gate
 - `passed` — every P0 screen matches spec across its states, no console errors, keyboard

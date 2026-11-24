@@ -35,9 +35,12 @@ The protocol core is split; **read `termination.md`, `tracks-and-models.md` from
    Every case owned by an implementer must have a `test_file`. A plan still holding `planned` or
    `implemented` cases at release time means the suite was never fully run — that fails.
 
-4. **Cross-cycle consistency, and the sign-offs themselves.** Confirm the passing review and QA
-   verdicts are from the **current** cycle against the **current** code. A pass from cycle 1 does
-   not carry forward past later changes.
+4. **Sign-off liveness.** For each passing `review`, `qa`, and `ui-qa` verdict, read its
+   `commit_or_files` scope and establish whether any file in it has changed since the sign-off was
+   written. Unchanged means the pass is **live** and counts, whatever cycle it came from; changed
+   means it is **stale** and the gate fails until that gate re-runs over the change (criterion 2).
+   Say which test you applied and what you compared — a cycle number is not the test, and
+   "it was cycle 1" is not a finding.
 
    Phase 8 signs off through `sdlc-review-lead`, whose block names the lenses that ran. Check
    that list: a lens recorded `not run` is an **unexamined angle**, not a clean one. If the
@@ -65,9 +68,21 @@ The protocol core is split; **read `termination.md`, `tracks-and-models.md` from
    conflict. A `skipped` figma-design gate is fine when the reason is recorded — no
    Figma, no access, or no user-facing surface — but "we ran out of time" is not one of those.
 
-5. **Issue ledger.** Confirm no open or fixing blocker/major issues, and that every
+5. **Issue ledger and advisories.** Confirm no open or fixing blocker/major issues, and that every
    `deferred` or `wontfix` carries a rationale. List every deferred item in the release
    record — deferred work that nobody sees is just hidden work.
+
+   Advisories are different and must not be audited as issues: `minor` and `nit` findings have no
+   ids, no statuses, and no bearing on the decision (criterion 5). Collect the
+   `## Advisories (minor, nit)` lines from this cycle's reports into the release record so the next
+   person can see what was left, and move on. An open advisory count is never a reason to fail a
+   gate or open a cycle. If a `minor` file exists at all, somebody broke the floor in protocol
+   section 4 — say so, and audit it as the `major` it was never promoted to.
+
+5b. **Spend against budget.** Read `budget` and compute `spend` from the log: cycles closed, and the
+   sum of every `run_usage.tokens` (protocol section 3). State both in your decision whether or not
+   they bear on it, and name how many runs reported no usage, since a token sum missing them reads
+   low. Write the figures back to `state.json` -> `spend`.
 
 6. **Decide** and write `10-release/cycle-<n>-decision.md`:
    - `ship` — all criteria met. Append `cycle_closed` for the current cycle first — the last
@@ -77,18 +92,25 @@ The protocol core is split; **read `termination.md`, `tracks-and-models.md` from
      `history/events.jsonl` to now (protocol section 3). Write `10-release/release-notes.md`:
      what changed in user terms, deferred items, migration or rollout notes, rollback trigger and
      procedure, and what to watch after release.
-   - `another_cycle` — criteria unmet and `cycle < max_cycles`. List exactly which gates
+   - `another_cycle` — criteria unmet and `spend.cycles < budget.cycles`. List exactly which gates
      failed, which issues must close, and which agents must run. Append `cycle_closed` with
      `duration_ms` (this cycle's `cycle_opened.ts` to now), then `cycle_opened` for `n+1`,
-     increment `cycle`, and reset the `review`, `qa`, and `ui-qa` gates to `pending`.
-   - `escalate` — `cycle >= max_cycles`, or the same issue has reopened in three cycles, or
+     increment `cycle`, and reset to `pending` **only the gates whose sign-offs step 4 found
+     stale** — a live pass keeps its gate, and resetting it schedules a phase that will re-read
+     untouched code and reach the same verdict at full cost. Never open a cycle whose whole
+     justification is advisories.
+   - `escalate` — `spend.cycles >= budget.cycles`, a set token budget exhausted, the same issue
+     reopened in three cycles, or
      a contradiction exists that only the human can resolve (conflicting requirements,
      an assumption proven wrong, scope that cannot be met under the constraints). Write
-     `history/ESCALATION.md`: what keeps failing, the root cause as best you can determine,
-     and two or three concrete options with their trade-offs. Set `status: blocked`.
+     `history/ESCALATION.md`: what keeps failing, the root cause as best you can determine, what
+     the run has spent, and two or three concrete options with their trade-offs — raising the
+     budget among them where more cycles would plausibly finish the work. You never raise it
+     yourself. Set `status: blocked`.
 
 7. **Report to the human** in your reply: the decision, the evidence in three or four
-   lines, the deferred list, and the single most important risk that remains.
+   lines, spend against budget, the deferred list, the advisory count as one number, and the single
+   most important risk that remains.
 
 Never pass a gate to end a loop. A stuck pipeline that is honestly stuck is a useful
 result; a green light that is not earned is the expensive failure.
